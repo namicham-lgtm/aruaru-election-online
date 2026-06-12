@@ -122,6 +122,26 @@
   .err{color:var(--pink-dark);font-weight:700;font-size:13px;min-height:1.2em;margin-top:6px}
   hr.soft{border:none;border-top:1px dashed var(--line);margin:16px 0}
   label.fld{display:block;font-weight:700;font-size:13px;margin:14px 0 6px;color:var(--ink)}
+  /* ---- 開票特番: 表彰台・リボン・紙吹雪・MVP ---- */
+  .r-intro{text-align:center}
+  .ribbon{display:block;width:fit-content;margin:4px auto 14px;background:var(--yellow);color:var(--yellow-ink);font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:21px;padding:8px 30px;border:2.5px solid var(--ink);border-radius:11px;transform:rotate(-2deg);box-shadow:4px 4px 0 rgba(0,0,0,.35);letter-spacing:.08em}
+  .match-big{text-align:center;font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:30px;color:var(--ink);margin:6px 0 14px}
+  .match-big small{font-size:16px;color:var(--ink-soft)}
+  .podium{display:flex;justify-content:center;align-items:flex-end;gap:8px;min-height:150px;margin:10px 0 6px}
+  .ped{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:30%;max-width:140px;position:relative}
+  .ped-head{text-align:center;margin-bottom:6px}
+  .ped-name{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:15px;color:var(--ink);line-height:1.2}
+  .ped-pt{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:15px;color:var(--pink-dark)}
+  .ped-pt small{font-size:10px;margin-left:1px}
+  .ped-bar{width:100%;border:2.5px solid var(--ink);border-radius:12px 12px 0 0;box-shadow:4px 4px 0 rgba(0,0,0,.3);transition:height .6s cubic-bezier(.34,1.56,.64,1);display:flex;align-items:flex-start;justify-content:center;overflow:hidden}
+  .ped1 .ped-bar{background:var(--yellow)} .ped2 .ped-bar{background:var(--cyan)} .ped3 .ped-bar{background:var(--pink)}
+  .ped-rank{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:22px;color:var(--ink);margin-top:8px}
+  .crown-svg{width:34px;height:24px;margin-bottom:3px}
+  .r-detail{display:none} .r-detail.show{display:block}
+  .mvp-sticker{display:inline-block;background:var(--yellow);color:var(--yellow-ink);font-weight:900;font-size:11px;padding:2px 8px;border:2px solid var(--ink);border-radius:7px;transform:rotate(-4deg);box-shadow:2px 2px 0 rgba(0,0,0,.3);margin-left:6px;white-space:nowrap}
+  .confetti{position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden}
+  .confetti i{position:absolute;top:-24px;border-radius:2px;animation:fall 2.5s linear forwards}
+  @keyframes fall{to{transform:translate(var(--dx),112vh) rotate(var(--rot));opacity:.9}}
   /* 出現アニメ（バックアウト=弾む）。各リスト項目を60msずつずらす */
   @keyframes popIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
   .pop-in>*{animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both}
@@ -216,11 +236,10 @@ function applyState(s){
   $("#roomBadge").textContent = "ROOM " + s.code;
   if (prevPhase !== s.phase) picked = [];
   render();
-  // フェーズ遷移SE（results は ドラムロール → 表示後ファンファーレ）
+  // フェーズ遷移SE（results は ドラムロール。ファンファーレは表彰台1位確定で renderResults が鳴らす）
   if (prevPhase && prevPhase !== s.phase && window.SFX){
     if (s.phase === "results"){
       SFX.drumroll();
-      setTimeout(()=>SFX.fanfare(), 1200);
     } else {
       SFX.phase();
     }
@@ -395,57 +414,150 @@ function renderVoting(){
   });
 }
 
+const CROWN_SVG = `<svg class="crown-svg" viewBox="0 0 40 28" aria-hidden="true"><path d="M3 25 L3 9 L12 16 L20 4 L28 16 L37 9 L37 25 Z" fill="${'#FFE14D'}" stroke="#241338" stroke-width="2.5" stroke-linejoin="round"/><circle cx="20" cy="11" r="2" fill="#241338"/></svg>`;
+const PED_H = { 1:110, 2:80, 3:60 };
+
 function renderResults(){
   const R = ST.results;
   const M = R.matchInfo;
   const isFinal = M && M.isFinal;
   const isHost = ST.you && ST.you.isHost;
-  // 当選バナー: 最終戦は累積1位（総合優勝）、途中戦はそのラウンドの最高得点者
-  let bannerLabel, bannerName, bannerPts;
-  if (isFinal){
-    const topC = M.standings[0].cumulative;
-    bannerLabel = "★ 総合優勝 ★";
-    bannerName = M.standings.filter(s=>s.cumulative===topC).map(s=>esc(s.name)).join(" ・ ");
-    bannerPts = `${topC} pt（累積）`;
-  } else {
-    const top = R.table[0];
-    bannerLabel = "★ 当選 ★";
-    bannerName = R.table.filter(r=>r.final===top.final).map(r=>esc(r.name)).join(" ・ ");
-    bannerPts = `${top.final} pt`;
-  }
-  app.innerHTML = `
-    ${M ? `<p class="small" style="text-align:center;font-weight:700;color:var(--cyan-dark)">第${M.current}戦 / 全${M.total}戦</p>` : ""}
-    <div class="winner"><div class="crown">${bannerLabel}</div><div class="name">${bannerName}</div><div class="pts">${bannerPts}</div></div>
+  // 表彰台は累積順（standings）。M が無い場合はラウンドfinalで代用。
+  const standings = (M && M.standings && M.standings.length)
+    ? M.standings
+    : R.table.map(r=>({ name:r.name, roundPts:r.final, cumulative:r.final }));
+  const top3 = standings.slice(0,3);
+  // DOM順は [2位,1位,3位]（中央に1位）。せり上がりは 3→2→1。
+  const order = [{s:top3[1],rank:2},{s:top3[0],rank:1},{s:top3[2],rank:3}].filter(o=>o.s);
+  const pedHtml = order.map(o=>`
+    <div class="ped ped${o.rank}" data-rank="${o.rank}">
+      ${o.rank===1 ? CROWN_SVG : ""}
+      <div class="ped-head"><div class="ped-name">${esc(o.s.name)}</div>
+        <div class="ped-pt"><span class="cup" data-to="${o.s.cumulative}">0</span><small>pt</small></div></div>
+      <div class="ped-bar" style="height:0"><span class="ped-rank">${o.rank}</span></div>
+    </div>`).join("");
+
+  const headerHtml = isFinal
+    ? `<div class="ribbon">総合優勝</div>`
+    : `<div class="match-big">第${M ? M.current : 1}戦 <small>/ 全${M ? M.total : 1}戦</small></div>`;
+
+  const maxVotes = R.reveal ? Math.max(0, ...R.reveal.map(x=>x.votes)) : -1;
+
+  const detailHtml = `
     <span class="eyebrow">開票結果（このラウンド）</span>
     <div style="overflow-x:auto;margin-top:6px"><table class="res">
       <thead><tr><th>順位</th><th class="nm">プレイヤー</th><th>投稿</th><th>得票</th><th>順位点</th><th>合計</th></tr></thead>
-      <tbody>${R.table.map(r=>`<tr><td class="rk">${r.rank}位</td><td class="nm">${esc(r.name)}<div>${r.tags.map(t=>`<span class="tag ${t.kind}">${esc(t.label)}</span>`).join("")}</div></td><td>${r.postCount}</td><td>${r.total}</td><td>${r.rankPts}</td><td class="fin">${r.final}</td></tr>`).join("")}</tbody>
+      <tbody class="pop-in">${R.table.map(r=>`<tr><td class="rk">${r.rank}位</td><td class="nm">${esc(r.name)}<div>${r.tags.map(t=>`<span class="tag ${t.kind}">${esc(t.label)}</span>`).join("")}</div></td><td>${r.postCount}</td><td>${r.total}</td><td>${r.rankPts}</td><td class="fin"><span class="cup-late" data-to="${r.final}">0</span></td></tr>`).join("")}</tbody>
     </table></div>
     ${M ? `
       <hr class="soft">
       <p class="small" style="font-weight:700;color:var(--ink)">累積順位（全${M.total}戦中 第${M.current}戦終了時点）</p>
       <div style="overflow-x:auto;margin-top:6px"><table class="res">
         <thead><tr><th>順位</th><th class="nm">プレイヤー</th><th>今回</th><th>累積</th></tr></thead>
-        <tbody>${M.standings.map((s,i)=>`<tr><td class="rk">${i+1}位</td><td class="nm">${esc(s.name)}</td><td>${s.roundPts}</td><td class="fin">${s.cumulative}</td></tr>`).join("")}</tbody>
+        <tbody class="pop-in">${M.standings.map((s,i)=>`<tr><td class="rk">${i+1}位</td><td class="nm">${esc(s.name)}</td><td>${s.roundPts}</td><td class="fin"><span class="cup-late" data-to="${s.cumulative}">0</span></td></tr>`).join("")}</tbody>
       </table></div>` : ""}
     ${R.reveal ? `
       <hr class="soft">
       <p class="small" style="font-weight:700;color:var(--ink)">答え合わせ — 誰が書いた？</p>
-      <ul class="reveal pop-in">${R.reveal.map(x=>`<li><span class="who">${esc(x.author)}</span><span>${esc(x.text)}</span><span class="vv">${x.votes}票</span></li>`).join("")}</ul>` : ""}
+      <ul class="reveal pop-in">${R.reveal.map(x=>`<li><span class="who">${esc(x.author)}</span><span>${esc(x.text)}</span>${(x.votes===maxVotes && maxVotes>0)?`<span class="mvp-sticker">MVPあるある</span>`:""}<span class="vv">${x.votes}票</span></li>`).join("")}</ul>` : ""}
     ${isHost ? (isFinal ? `
       <div class="row" style="margin-top:8px">
         <button class="btn cyan" id="rematch">同じメンバーでもう一度</button>
         <button class="btn ghost" id="disband">ルームを解散</button>
       </div>` : `<button class="btn cyan" id="again" style="margin-top:8px">次のお題へ →</button>`)
       : `<p class="muted small">${isFinal ? "ホストが次の操作を選びます。" : "ホストが次のラウンドを開始できます。"}</p>`}`;
-  if (isHost){
+
+  app.innerHTML = `
+    <div id="rIntro" class="r-intro">
+      <span class="eyebrow">開票中</span>
+      <div class="stage" style="min-height:160px;margin-top:12px"><div class="bbox sway">${MASCOT}<span class="face">開票</span></div></div>
+      <p class="muted small">集計しています…</p>
+    </div>
+    <div id="rShow" style="display:none">
+      ${headerHtml}
+      <div class="podium">${pedHtml}</div>
+      <div id="rDetail" class="r-detail">${detailHtml}</div>
+    </div>`;
+
+  const bindControls = ()=>{
+    if (!isHost) return;
     if (isFinal){
-      $("#rematch").onclick = ()=> socket.emit("game:rematch");
-      $("#disband").onclick = ()=> socket.emit("room:disband");
+      $("#rematch") && ($("#rematch").onclick = ()=> socket.emit("game:rematch"));
+      $("#disband") && ($("#disband").onclick = ()=> socket.emit("room:disband"));
     } else {
-      $("#again").onclick = ()=> socket.emit("game:again");
+      $("#again") && ($("#again").onclick = ()=> socket.emit("game:again"));
     }
+  };
+
+  // reduced-motion: 全演出スキップで最終状態を即時表示
+  if (REDUCED){
+    $("#rIntro").style.display = "none";
+    $("#rShow").style.display = "block";
+    $("#rDetail").classList.add("show");
+    document.querySelectorAll(".ped-bar").forEach(b=>{
+      b.style.transition = "none";
+      b.style.height = PED_H[b.parentElement.dataset.rank] + "px";
+    });
+    document.querySelectorAll(".cup,.cup-late").forEach(c=> c.textContent = c.dataset.to);
+    bindControls();
+    return;
   }
+
+  // タイムライン: 1.2s後に表彰台 → 3→2→1 をせり上げ → 1位で詳細＆紙吹雪
+  setTimeout(()=>{
+    const show = $("#rShow"); if (!show) return;
+    $("#rIntro").style.display = "none";
+    show.style.display = "block";
+    [3,2,1].forEach((rk,idx)=> setTimeout(()=>{
+      const ped = document.querySelector(`.ped${rk}`); if (!ped) return;
+      const bar = ped.querySelector(".ped-bar"); if (bar) bar.style.height = PED_H[rk] + "px";
+      const cup = ped.querySelector(".cup"); if (cup) countUp(cup, +cup.dataset.to, 800);
+      window.SFX && SFX.tap();
+      if (rk === 1){
+        window.SFX && SFX.fanfare();
+        if (isFinal) launchConfetti();
+        const det = $("#rDetail");
+        if (det){
+          det.classList.add("show"); // .pop-in 子要素がここから出現
+          det.querySelectorAll(".cup-late").forEach(c=> countUp(c, +c.dataset.to, 800));
+          bindControls();
+        }
+      }
+    }, idx*600));
+  }, 1200);
+}
+
+/* ---------- カウントアップ / 紙吹雪 ---------- */
+function countUp(el, to, dur){
+  if (REDUCED){ el.textContent = to; return; }
+  const start = performance.now();
+  const step = (t)=>{
+    const p = Math.min(1, (t-start)/dur);
+    el.textContent = Math.round(to * p);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function launchConfetti(){
+  if (REDUCED) return;
+  const colors = ["#FF2E88","#19D3DA","#FFE14D","#ffffff","#2f1c47"]; // 配色5色
+  const box = document.createElement("div");
+  box.className = "confetti";
+  const n = 60 + Math.floor(Math.random()*21); // 60〜80
+  for (let i=0;i<n;i++){
+    const p = document.createElement("i");
+    const w = 6 + Math.random()*4;
+    p.style.left = (Math.random()*100) + "vw";
+    p.style.width = w + "px";
+    p.style.height = (w*1.4) + "px";
+    p.style.background = colors[Math.floor(Math.random()*colors.length)];
+    p.style.setProperty("--dx", (Math.random()*120-60) + "px");
+    p.style.setProperty("--rot", (Math.random()*1080-360) + "deg");
+    p.style.animationDelay = (Math.random()*0.3) + "s";
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+  setTimeout(()=> box.remove(), 3200);
 }
 
 /* ---------- 投げ込みアニメ（同期演出の受け口） ---------- */
