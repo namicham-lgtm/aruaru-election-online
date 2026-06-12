@@ -15,57 +15,70 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
-  body{font-family:"Noto Sans JP",sans-serif;background:var(--stage);color:#fff;min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased}
+  body{font-family:"Noto Sans JP",sans-serif;background:var(--stage);color:#fff;min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased;position:relative}
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(circle at 50% -10%, #3a2160 0%, var(--stage) 55%)}
+  /* 紙吹雪ドット柄（微小SVG data-URI / opacity .06） */
+  body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.06;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='6' cy='6' r='2.5' fill='%23fff'/%3E%3Crect x='26' y='22' width='5' height='5' fill='%23fff' transform='rotate(20 28 24)'/%3E%3Ccircle cx='32' cy='34' r='1.8' fill='%23fff'/%3E%3C/svg%3E")}
+  .wrap{position:relative;z-index:1}
   .wrap{max-width:680px;margin:0 auto;padding:16px 14px 40px;min-height:100vh;display:flex;flex-direction:column}
   .mast{display:flex;align-items:baseline;gap:10px;padding:6px 2px 14px;flex-wrap:wrap}
   .mast .jp{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:24px}
   .mast .en{font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:11px;letter-spacing:.32em;color:var(--cyan);text-transform:uppercase}
-  .mast .room{font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:12px;color:var(--yellow);border:1.5px solid var(--yellow);border-radius:7px;padding:3px 9px;letter-spacing:.12em}
+  .mast .room{font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:12px;color:var(--yellow);border:2.5px solid var(--yellow);border-radius:9px;padding:3px 9px;letter-spacing:.12em;transform:rotate(-2deg);box-shadow:2px 2px 0 rgba(0,0,0,.35)}
   .muteBtn{margin-left:auto;background:transparent;border:none;font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;border-radius:7px}
   .muteBtn:hover{background:rgba(255,255,255,.1)}
   .muteBtn.off{opacity:.55}
-  .panel{background:var(--card);color:var(--ink);border-radius:14px;padding:20px 18px;flex:1}
-  .night{background:var(--stage-2);color:#fff;border-radius:12px;padding:16px}
+  .panel{background:var(--card);color:var(--ink);border-radius:18px;padding:20px 18px;flex:1;border:2.5px solid var(--ink);box-shadow:4px 4px 0 rgba(0,0,0,.35)}
+  .night{background:var(--stage-2);color:#fff;border-radius:18px;padding:16px;border:2.5px solid rgba(255,255,255,.9);box-shadow:4px 4px 0 rgba(0,0,0,.35)}
   h2{margin:0;font-family:"Zen Kaku Gothic Antique";font-weight:900}
-  .eyebrow{font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--pink)}
+  .eyebrow{display:inline-block;font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#fff;background:var(--pink);padding:3px 9px;border-radius:8px;border:2px solid var(--ink);transform:rotate(-2deg);box-shadow:2px 2px 0 rgba(0,0,0,.3)}
   .muted{color:var(--ink-soft)} .small{font-size:13px} p{margin:.45em 0}
   input[type=text]{width:100%;font-family:inherit;font-size:16px;padding:11px 12px;border:1.5px solid var(--line);border-radius:9px;color:var(--ink)}
   input:focus,button:focus-visible{outline:3px solid rgba(25,211,218,.5);outline-offset:1px}
-  .btn{font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:16px;border:none;border-radius:10px;padding:13px 16px;cursor:pointer;width:100%;transition:transform .08s,filter .15s}
-  .btn:active{transform:translateY(1px)} .btn:disabled{opacity:.45;cursor:not-allowed}
-  .btn.pink{background:var(--pink);color:#fff} .btn.pink:hover{filter:brightness(1.08)}
-  .btn.cyan{background:var(--cyan);color:#003e41}
-  .btn.dark{background:var(--ink);color:#fff}
-  .btn.ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+  .btn{--btnsh:rgba(0,0,0,.4);font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:16px;border:2.5px solid var(--ink);border-radius:14px;padding:13px 16px;cursor:pointer;width:100%;box-shadow:0 4px 0 var(--btnsh);transition:transform .08s,filter .15s,box-shadow .08s}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--btnsh)} .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.pink{background:var(--pink);color:#fff;--btnsh:var(--pink-dark)} .btn.pink:hover{filter:brightness(1.08)}
+  .btn.cyan{background:var(--cyan);color:#003e41;--btnsh:var(--cyan-dark)}
+  .btn.dark{background:var(--ink);color:#fff;--btnsh:#000}
+  .btn.ghost{background:#fff;border:2.5px solid var(--ink);color:var(--ink);--btnsh:var(--line)}
   .btn.sm{width:auto;padding:9px 14px;font-size:14px}
   .row{display:flex;gap:10px;flex-wrap:wrap} .row>*{flex:1}
   .seg{display:flex;gap:8px;flex-wrap:wrap}
-  .seg button{flex:1;min-width:60px;font-weight:700;font-size:14px;padding:10px;border:1.5px solid var(--line);background:#fff;border-radius:9px;cursor:pointer;color:var(--ink)}
-  .seg button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
-  .theme-box{background:var(--stage);border-radius:12px;padding:16px;text-align:center;margin:6px 0}
+  .seg button{flex:1;min-width:60px;font-weight:700;font-size:14px;padding:10px;border:2.5px solid var(--ink);background:#fff;border-radius:12px;cursor:pointer;color:var(--ink);box-shadow:0 3px 0 var(--line);transition:transform .08s,box-shadow .08s}
+  .seg button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
+  .seg button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:0 3px 0 #000}
+  .theme-box{background:var(--stage);border-radius:18px;padding:16px;text-align:center;margin:6px 0;border:2.5px solid var(--ink);box-shadow:4px 4px 0 rgba(0,0,0,.35)}
   .theme-box .lbl{font-size:11px;letter-spacing:.3em;color:var(--cyan);font-weight:700}
   .theme-box .t{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:28px;color:#fff;margin-top:2px}
   .timer{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:38px;text-align:center;color:var(--ink)}
   .timer.warn{color:var(--pink)}
   .plist{list-style:none;padding:0;margin:12px 0;display:flex;flex-wrap:wrap;gap:8px}
-  .plist li{background:#f4f2f8;border-radius:20px;padding:6px 14px;font-weight:700;font-size:14px;display:flex;gap:7px;align-items:center}
+  .plist li{background:#f4f2f8;border-radius:20px;padding:6px 14px;font-weight:700;font-size:14px;display:flex;gap:7px;align-items:center;border:2px solid var(--ink);box-shadow:2px 2px 0 rgba(0,0,0,.2)}
   .plist .dot{width:9px;height:9px;border-radius:50%;background:var(--cyan)}
   .plist .dot.off{background:#c9c4d4}
   .plist .done{color:var(--cyan-dark);font-size:12px}
   /* ballot stage */
-  .stage{position:relative;min-height:150px;background:var(--stage);border-radius:12px;display:flex;align-items:flex-end;justify-content:center;padding:10px 0 8px;overflow:hidden}
-  .bbox{position:relative;width:92px;height:70px;border:2.5px solid #fff;border-radius:8px;background:var(--stage-2)}
-  .bbox::before{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%) rotate(-2deg);width:50px;height:7px;background:#fff;border-radius:3px}
-  .bbox .face{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:12px;color:#fff;letter-spacing:.12em}
+  .stage{position:relative;min-height:150px;background:var(--stage);border-radius:18px;display:flex;align-items:flex-end;justify-content:center;padding:10px 0 8px;overflow:hidden;border:2.5px solid var(--ink);box-shadow:inset 0 0 0 2px rgba(255,255,255,.04)}
+  .bbox{position:relative;width:92px;height:70px;border:2.5px solid #fff;border-radius:10px;background:var(--stage-2);transform-origin:bottom center}
+  .bbox::before{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%) rotate(-2deg);width:50px;height:7px;background:#fff;border-radius:3px;z-index:3}
+  /* マスコット「投函箱くん」: 目+笑い口 */
+  .bbox .mascot{position:absolute;inset:0;width:100%;height:100%;z-index:2}
+  .bbox .mascot .eyes{transform-box:fill-box;transform-origin:center;animation:blink 3s infinite}
+  .bbox .face{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:11px;color:#fff;letter-spacing:.12em;z-index:3}
   .bbox.pulse{animation:bpulse .3s ease}
+  .bbox.sway{animation:sway 1.2s ease-in-out infinite}
   @keyframes bpulse{50%{transform:scale(1.07)}}
+  @keyframes blink{0%,90%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+  @keyframes sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
   .paper{position:absolute;width:32px;height:23px;background:#fff;border:1.5px solid var(--pink);border-radius:3px;z-index:2}
   .paper.alt{border-color:var(--cyan)}
   .paper::after{content:"";position:absolute;top:5px;left:5px;right:5px;height:2px;background:var(--line);box-shadow:0 4px 0 var(--line),0 8px 0 var(--line)}
   @keyframes throwIn{0%{transform:translate(var(--fx),var(--fy)) rotate(var(--fr)) scale(1);opacity:0}15%{opacity:1}100%{transform:translate(0,0) rotate(0) scale(.34);opacity:0}}
   .thrown-cnt{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:15px;text-align:center;color:var(--yellow);margin-top:8px}
   .post-list{list-style:none;padding:0;margin:12px 0 0}
-  .post-list li{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:7px;display:flex;gap:10px;align-items:center;color:var(--ink)}
+  .post-list li{background:#fff;border:2.5px solid var(--ink);border-radius:14px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;color:var(--ink);box-shadow:3px 3px 0 rgba(0,0,0,.18)}
   .post-list .num{font-family:"Zen Kaku Gothic Antique";font-weight:900;color:var(--pink);min-width:20px}
   .post-list .txt{flex:1}
   .del{background:none;border:none;color:var(--ink-soft);font-size:17px;cursor:pointer;padding:2px 6px}
@@ -74,19 +87,21 @@
   .dist .cnt{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:18px;min-width:70px}
   .dist .bar-w{flex:1} .dist .bar{height:10px;background:var(--cyan);border-radius:5px}
   .gallery{list-style:none;padding:0;margin:12px 0}
-  .gallery li{background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 13px;margin-bottom:8px;font-size:15px;color:var(--ink)}
+  .gallery li{background:#fff;border:2.5px solid var(--ink);border-radius:14px;padding:10px 13px;margin-bottom:9px;font-size:15px;color:var(--ink);box-shadow:3px 3px 0 rgba(0,0,0,.18)}
   .vote-grid{display:grid;gap:9px;margin:12px 0}
-  .vcard{text-align:left;background:#fff;border:2px solid var(--line);border-radius:10px;padding:12px 12px 12px 44px;position:relative;cursor:pointer;font-size:15px;color:var(--ink);font-family:inherit;font-weight:500}
+  .vcard{text-align:left;background:#fff;border:2.5px solid var(--ink);border-radius:14px;padding:12px 12px 12px 44px;position:relative;cursor:pointer;font-size:15px;color:var(--ink);font-family:inherit;font-weight:500;box-shadow:0 3px 0 var(--line);transition:transform .08s,box-shadow .08s,border-color .12s}
   .vcard:hover{border-color:var(--cyan)}
-  .vcard[aria-pressed=true]{border-color:var(--pink);box-shadow:inset 5px 0 0 var(--pink)}
+  .vcard:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
+  .vcard[aria-pressed=true]{border-color:var(--pink);box-shadow:inset 5px 0 0 var(--pink),0 3px 0 var(--pink-dark)}
   .vcard .check{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:21px;height:21px;border-radius:50%;border:2px solid var(--line)}
   .vcard[aria-pressed=true] .check{background:var(--pink);border-color:var(--pink)}
   .vcard[aria-pressed=true] .check::after{content:"✓";color:#fff;font-size:12px;position:absolute;left:4px;top:-2px;font-weight:900}
   .vcard.mine{opacity:.5;cursor:not-allowed;font-style:italic;padding-left:13px}
   .vcard.mine .check{display:none}
   .ballotbar{position:sticky;bottom:0;background:var(--card);padding:11px 0 2px;margin-top:6px;border-top:2px solid var(--ink)}
-  .counter{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:15px;text-align:center;margin-bottom:8px;color:var(--ink)}
-  .winner{text-align:center;background:var(--stage);border-radius:14px;padding:20px;margin-bottom:16px}
+  .counter{display:inline-block;font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:15px;text-align:center;margin:0 auto 8px;color:var(--yellow-ink);background:var(--yellow);padding:4px 12px;border-radius:9px;border:2px solid var(--ink);transform:rotate(-2deg);box-shadow:2px 2px 0 rgba(0,0,0,.3)}
+  .ballotbar .counter{display:block;width:fit-content}
+  .winner{text-align:center;background:var(--stage);border-radius:18px;padding:20px;margin-bottom:16px;border:2.5px solid var(--ink);box-shadow:4px 4px 0 rgba(0,0,0,.35)}
   .winner .crown{color:var(--yellow);font-size:13px;letter-spacing:.3em;font-weight:700}
   .winner .name{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:32px;color:#fff;margin:4px 0 0}
   .winner .pts{color:var(--yellow);font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:17px}
@@ -99,7 +114,7 @@
   .tag.plus{background:#fff4c2;color:#6b5000} .tag.minus{background:#ffd9e8;color:var(--pink-dark)}
   .rk{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:15px}
   .reveal{list-style:none;padding:0;margin:10px 0}
-  .reveal li{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin-bottom:7px;color:var(--ink);display:flex;gap:10px;align-items:baseline}
+  .reveal li{background:#fff;border:2px solid var(--ink);border-radius:12px;padding:9px 12px;margin-bottom:8px;color:var(--ink);display:flex;gap:10px;align-items:baseline;box-shadow:2px 2px 0 rgba(0,0,0,.15)}
   .reveal .who{font-family:"Zen Kaku Gothic Antique";font-weight:700;color:var(--cyan-dark);min-width:64px;font-size:13px}
   .reveal .vv{margin-left:auto;font-weight:900;color:var(--pink);font-size:13px;white-space:nowrap}
   .hint{background:#f4f2f8;border-left:3px solid var(--cyan);padding:9px 12px;border-radius:0 8px 8px 0;font-size:13px;margin:12px 0;color:var(--ink)}
@@ -107,6 +122,20 @@
   .err{color:var(--pink-dark);font-weight:700;font-size:13px;min-height:1.2em;margin-top:6px}
   hr.soft{border:none;border-top:1px dashed var(--line);margin:16px 0}
   label.fld{display:block;font-weight:700;font-size:13px;margin:14px 0 6px;color:var(--ink)}
+  /* 出現アニメ（バックアウト=弾む）。各リスト項目を60msずつずらす */
+  @keyframes popIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
+  .pop-in>*{animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both}
+  .pop-in>*:nth-child(1){animation-delay:0ms}
+  .pop-in>*:nth-child(2){animation-delay:60ms}
+  .pop-in>*:nth-child(3){animation-delay:120ms}
+  .pop-in>*:nth-child(4){animation-delay:180ms}
+  .pop-in>*:nth-child(5){animation-delay:240ms}
+  .pop-in>*:nth-child(6){animation-delay:300ms}
+  .pop-in>*:nth-child(7){animation-delay:360ms}
+  .pop-in>*:nth-child(8){animation-delay:420ms}
+  .pop-in>*:nth-child(9){animation-delay:480ms}
+  .pop-in>*:nth-child(n+10){animation-delay:540ms}
+  /* reduced-motion: 出現アニメ・まばたき・揺れを全て無効化 */
   @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -123,6 +152,8 @@ const $ = (s)=>document.querySelector(s);
 const app = $("#app");
 const esc = (s)=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+// マスコット「投函箱くん」の顔（目+笑い口）。マークアップのみ。
+const MASCOT = `<svg class="mascot" viewBox="0 0 92 70" aria-hidden="true"><g class="eyes"><circle cx="34" cy="36" r="7" fill="#fff"/><circle cx="58" cy="36" r="7" fill="#fff"/><circle cx="35" cy="37" r="3.4" fill="#241338"/><circle cx="59" cy="37" r="3.4" fill="#241338"/></g><path d="M33 47 Q46 56 59 47" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/></svg>`;
 
 /* ---------- ミュートトグル ---------- */
 (function initMute(){
@@ -238,7 +269,7 @@ function renderLobby(){
     <span class="eyebrow">Lobby · ROOM ${esc(ST.code)}</span>
     <h2 style="font-size:22px;margin-top:4px">参加者 ${n}人</h2>
     <p class="muted small">このコードを共有して集合。${n < ST.recommended ? `<b>推奨は${ST.recommended}人以上</b>です。` : ""}</p>
-    <ul class="plist">${ST.players.map(p=>`<li><span class="dot ${p.connected?"":"off"}"></span>${esc(p.name)}</li>`).join("")}</ul>
+    <ul class="plist pop-in">${ST.players.map(p=>`<li><span class="dot ${p.connected?"":"off"}"></span>${esc(p.name)}</li>`).join("")}</ul>
     ${isHost ? `
       <label class="fld">投稿フェーズの制限時間</label>
       <div class="seg" id="seg">${[[30,"30秒"],[60,"60秒"],[120,"120秒"],[0,"無制限"]].map(([v,l])=>`<button data-v="${v}" aria-pressed="${v===120}">${l}</button>`).join("")}</div>
@@ -268,12 +299,12 @@ function renderPosting(){
   app.innerHTML = `
     <div class="theme-box"><div class="lbl">THEME</div><div class="t">${esc(ST.theme)}</div></div>
     <div class="timer" id="tmr">${ST.postingEndsAt ? "" : "∞"}</div>
-    <div class="stage" id="stage" style="min-height:120px"><div class="bbox" id="bbox"><span class="face">投函</span></div></div>
+    <div class="stage" id="stage" style="min-height:120px"><div class="bbox" id="bbox">${MASCOT}<span class="face">投函</span></div></div>
     <div class="thrown-cnt" id="thrownCnt">投函 ${ST.totalThrown ?? 0} 枚</div>
     ${done ? `<p class="hint" style="margin-top:14px">投稿を締め切りました。全員の締切を待っています…（${ST.players.filter(p=>p.done).length}/${ST.players.length}）</p>` : `
     <input type="text" id="inp" maxlength="60" placeholder="あるあるを入力 → 投函" style="margin-top:14px">
     <div class="row" style="margin-top:8px"><button class="btn dark" id="add">投函する（1件ずつ）</button></div>`}
-    <ul class="post-list" id="list">${mine.map((p,i)=>`<li><span class="num">${i+1}</span><span class="txt">${esc(p.text)}</span></li>`).join("")}</ul>
+    <ul class="post-list pop-in" id="list">${mine.map((p,i)=>`<li><span class="num">${i+1}</span><span class="txt">${esc(p.text)}</span></li>`).join("")}</ul>
     ${done?"":`<p class="muted small" style="margin-top:6px">投函した投稿は取り消せません。</p><button class="btn pink" id="doneBtn" style="margin-top:8px">投稿を終える →</button>`}`;
   if (!done){
     const inp = $("#inp");
@@ -303,7 +334,7 @@ function renderCollect(){
   app.innerHTML = `
     <span class="eyebrow">Collecting</span>
     <h2 style="font-size:21px;margin-top:4px">開票箱に集まっています…</h2>
-    <div class="stage" id="stage" style="min-height:200px;margin-top:12px"><div class="bbox" id="bbox"><span class="face">投函</span></div></div>
+    <div class="stage" id="stage" style="min-height:200px;margin-top:12px"><div class="bbox sway" id="bbox">${MASCOT}<span class="face">投函</span></div></div>
     <div class="thrown-cnt" id="thrownCnt">全 ${ST.totalThrown} 枚</div>
     <p class="muted small" style="color:var(--ink-soft);text-align:center">まもなく一覧が公開されます</p>`;
   // 全クライアント同時の集約演出（サーバが gallery へ自動遷移）
@@ -320,10 +351,10 @@ function renderGallery(){
     <span class="eyebrow">Discussion · これ誰が書いた？</span>
     <h2 style="font-size:21px;margin-top:4px">全員のあるある</h2>
     <p class="muted small">お題「${esc(ST.theme)}」。投票前に、みんなで読んで語り合う時間。</p>
-    <ul class="gallery">${ST.posts.map(p=>`<li>${esc(p.text)}</li>`).join("")}</ul>
+    <ul class="gallery pop-in">${ST.posts.map(p=>`<li>${esc(p.text)}</li>`).join("")}</ul>
     <hr class="soft">
     <p class="small" style="font-weight:700;color:var(--ink)">投稿数の分布（匿名）</p>
-    <ul class="dist">${ST.distribution.map(d=>`<li><span class="cnt">${d.posts}投稿</span><span class="bar-w"><span class="bar" style="width:${20+(d.people/maxPpl)*70}%;display:block"></span></span><span style="font-weight:700">${d.people}人</span></li>`).join("")}</ul>
+    <ul class="dist pop-in">${ST.distribution.map(d=>`<li><span class="cnt">${d.posts}投稿</span><span class="bar-w"><span class="bar" style="width:${20+(d.people/maxPpl)*70}%;display:block"></span></span><span style="font-weight:700">${d.people}人</span></li>`).join("")}</ul>
     ${isHost ? `<button class="btn pink" id="next">投票フェーズへ →</button>` : `<p class="muted">ホストの合図で投票へ進みます。</p>`}`;
   if (isHost) $("#next").onclick = ()=> socket.emit("gallery:next");
 }
@@ -333,7 +364,7 @@ function renderVoting(){
     app.innerHTML = `
       <span class="eyebrow">Voting</span>
       <h2 style="font-size:21px;margin-top:4px">投票完了</h2>
-      <div class="stage" style="min-height:150px;margin-top:12px"><div class="bbox" id="bbox"><span class="face">投票</span></div></div>
+      <div class="stage" style="min-height:150px;margin-top:12px"><div class="bbox" id="bbox">${MASCOT}<span class="face">投票</span></div></div>
       <p class="hint" id="voteProg" style="text-align:center">投票済み ${ST.players.filter(p=>p.done).length} / ${ST.players.length} 人</p>
       <p class="muted small" style="color:var(--ink-soft)">全員の投票が揃うと自動で開票します。</p>`;
     return;
@@ -344,7 +375,7 @@ function renderVoting(){
     <h2 style="font-size:21px;margin-top:4px">共感したあるあるに投票</h2>
     <p class="muted small">お題「${esc(ST.theme)}」／持ち票 ${need}票（1投稿1票・自分以外）</p>
     ${ST.lowPostWarning ? `<div class="warnbox">投稿が少ないラウンドです。票の選択肢が限られます。</div>` : ""}
-    <div class="vote-grid" id="grid">${ST.posts.map(p=>{
+    <div class="vote-grid pop-in" id="grid">${ST.posts.map(p=>{
       if (p.mine) return `<button class="vcard mine" disabled>${esc(p.text)}<span style="display:block;font-size:11px;margin-top:2px">自分の投稿（投票不可）</span></button>`;
       return `<button class="vcard" data-id="${p.id}" aria-pressed="${picked.includes(p.id)}"><span class="check"></span>${esc(p.text)}</button>`;
     }).join("")}</div>
@@ -400,7 +431,7 @@ function renderResults(){
     ${R.reveal ? `
       <hr class="soft">
       <p class="small" style="font-weight:700;color:var(--ink)">答え合わせ — 誰が書いた？</p>
-      <ul class="reveal">${R.reveal.map(x=>`<li><span class="who">${esc(x.author)}</span><span>${esc(x.text)}</span><span class="vv">${x.votes}票</span></li>`).join("")}</ul>` : ""}
+      <ul class="reveal pop-in">${R.reveal.map(x=>`<li><span class="who">${esc(x.author)}</span><span>${esc(x.text)}</span><span class="vv">${x.votes}票</span></li>`).join("")}</ul>` : ""}
     ${isHost ? (isFinal ? `
       <div class="row" style="margin-top:8px">
         <button class="btn cyan" id="rematch">同じメンバーでもう一度</button>
