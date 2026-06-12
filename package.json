@@ -1,0 +1,23 @@
+{
+  "name": "aruaru-election-online",
+  "version": "1.0.0",
+  "description": "あるある選挙 オンライン多人数版",
+  "main": "server.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/scoring.test.js && node test/run-e2e.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
+  }
+}
