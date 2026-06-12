@@ -20,7 +20,10 @@
   .mast{display:flex;align-items:baseline;gap:10px;padding:6px 2px 14px;flex-wrap:wrap}
   .mast .jp{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:24px}
   .mast .en{font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:11px;letter-spacing:.32em;color:var(--cyan);text-transform:uppercase}
-  .mast .room{margin-left:auto;font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:12px;color:var(--yellow);border:1.5px solid var(--yellow);border-radius:7px;padding:3px 9px;letter-spacing:.12em}
+  .mast .room{font-family:"Zen Kaku Gothic Antique";font-weight:700;font-size:12px;color:var(--yellow);border:1.5px solid var(--yellow);border-radius:7px;padding:3px 9px;letter-spacing:.12em}
+  .muteBtn{margin-left:auto;background:transparent;border:none;font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;border-radius:7px}
+  .muteBtn:hover{background:rgba(255,255,255,.1)}
+  .muteBtn.off{opacity:.55}
   .panel{background:var(--card);color:var(--ink);border-radius:14px;padding:20px 18px;flex:1}
   .night{background:var(--stage-2);color:#fff;border-radius:12px;padding:16px}
   h2{margin:0;font-family:"Zen Kaku Gothic Antique";font-weight:900}
@@ -109,16 +112,29 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="mast"><span class="jp">あるある選挙</span><span class="en">Aruaru Election</span><span class="room" id="roomBadge" style="display:none"></span></div>
+  <div class="mast"><span class="jp">あるある選挙</span><span class="en">Aruaru Election</span><button id="muteBtn" class="muteBtn" aria-label="効果音切替">🔊</button><span class="room" id="roomBadge" style="display:none"></span></div>
   <div class="panel" id="app"></div>
 </div>
 <script src="/socket.io/socket.io.js"></script>
+<script src="/sfx.js"></script>
 <script>
 const socket = io();
 const $ = (s)=>document.querySelector(s);
 const app = $("#app");
 const esc = (s)=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- ミュートトグル ---------- */
+(function initMute(){
+  const btn = $("#muteBtn");
+  const sync = ()=>{
+    const m = window.SFX ? SFX.isMuted() : false;
+    btn.textContent = m ? "🔇" : "🔊";
+    btn.classList.toggle("off", m);
+  };
+  sync();
+  btn.onclick = ()=>{ if(window.SFX){ SFX.setMuted(!SFX.isMuted()); } sync(); };
+})();
 
 let TOKEN = sessionStorage.getItem("aru_token") || null;
 let CODE  = sessionStorage.getItem("aru_code") || null;
@@ -150,6 +166,7 @@ socket.on("post:thrown", ({ total }) => {
 socket.on("vote:cast", ({ voted, total }) => {
   const el = $("#voteProg"); if (el) el.textContent = `投票済み ${voted} / ${total} 人`;
   throwPaper(true);
+  window.SFX && SFX.vote();
 });
 
 function applyState(s){
@@ -159,6 +176,15 @@ function applyState(s){
   $("#roomBadge").textContent = "ROOM " + s.code;
   if (prevPhase !== s.phase) picked = [];
   render();
+  // フェーズ遷移SE（results は ドラムロール → 表示後ファンファーレ）
+  if (prevPhase && prevPhase !== s.phase && window.SFX){
+    if (s.phase === "results"){
+      SFX.drumroll();
+      setTimeout(()=>SFX.fanfare(), 1200);
+    } else {
+      SFX.phase();
+    }
+  }
 }
 
 /* ---------- 画面 ---------- */
@@ -384,6 +410,7 @@ function renderResults(){
 
 /* ---------- 投げ込みアニメ（同期演出の受け口） ---------- */
 function throwPaper(alt){
+  window.SFX && SFX.throw();
   if (REDUCED) return;
   const stage = $("#stage"), box = $("#bbox");
   if (!stage || !box) return;
