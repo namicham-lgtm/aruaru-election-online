@@ -136,6 +136,14 @@ const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
   btn.onclick = ()=>{ if(window.SFX){ SFX.setMuted(!SFX.isMuted()); } sync(); };
 })();
 
+/* ---------- 操作SE（イベント委譲・1箇所のみ） ---------- */
+document.addEventListener("click", e => {
+  const t = e.target.closest("button");
+  if (!t || t.disabled) return;
+  if (t.classList.contains("vcard")) { window.SFX && SFX.select(); return; }
+  window.SFX && SFX.tap();
+});
+
 let TOKEN = sessionStorage.getItem("aru_token") || null;
 let CODE  = sessionStorage.getItem("aru_code") || null;
 let ST = null;          // 最新スナップショット

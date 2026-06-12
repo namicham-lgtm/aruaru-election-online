@@ -92,6 +92,27 @@
       osc.start(t + 0.04);
       osc.stop(t + 0.24);
     },
+    // タップ音: 短いブリップ square 880→660Hz 約0.06s
+    tap() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(880, t);
+      osc.frequency.exponentialRampToValueAtTime(660, t + 0.06);
+      g.gain.setValueAtTime(0.15, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      osc.connect(g).connect(master);
+      osc.start(t);
+      osc.stop(t + 0.08);
+    },
+    // 選択トグル音: sine C5 単音 約0.09s
+    select() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      tone(523.25, t, 0.09, { type: "sine", gain: 0.18, release: 0.05 });
+    },
     // 投票確定: 明るい2音チャイム E5→A5 約0.3s
     vote() {
       if (!ready()) return;
