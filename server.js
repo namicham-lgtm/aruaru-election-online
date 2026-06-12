@@ -40,6 +40,8 @@ function makeRoom(code) {
     phase: "lobby", // lobby | posting | collect | gallery | voting | results
     theme: null,
     themeHistory: [],
+    totalMatches: 3,
+    currentMatch: 1,
     postingSeconds: 120,
     postingEndsAt: null,
     postingTimer: null,
@@ -181,11 +183,28 @@ function maybeFinishVoting(room) {
   const rows = computeResults(players, room.votes);
   const voteCount = {};
   Object.entries(room.votes).forEach(([id, v]) => (voteCount[id] = v.length));
+  // 累積スコア: ラウンド採点確定時に final を加算（id=token で対応付け）
+  rows.forEach((r) => {
+    const p = room.players.get(r.id);
+    if (p) p.cumulative += r.final;
+  });
+  const standings = [...room.players.values()]
+    .map((p) => {
+      const r = rows.find((x) => x.id === p.token);
+      return { name: p.name, roundPts: r ? r.final : 0, cumulative: p.cumulative };
+    })
+    .sort((a, b) => b.cumulative - a.cumulative);
   room.results = {
     table: rows.map((r) => ({
       name: r.name, rank: r.rank, postCount: r.postCount,
       total: r.total, rankPts: r.rankPts, final: r.final, tags: r.tags,
     })),
+    matchInfo: {
+      current: room.currentMatch,
+      total: room.totalMatches,
+      isFinal: room.currentMatch === room.totalMatches,
+      standings,
+    },
     reveal: REVEAL_AUTHORS_IN_RESULTS
       ? (room.galleryOrder || []).map((po) => ({
           text: po.text,
@@ -236,7 +255,7 @@ io.on("connection", (socket) => {
       return cb({ error: "同じ名前の参加者がいます" });
     const token = crypto.randomBytes(12).toString("hex");
     room.players.set(token, {
-      token, name: clean, socketId: socket.id, posts: [], doneRound: false, votedIds: null,
+      token, name: clean, socketId: socket.id, posts: [], doneRound: false, votedIds: null, cumulative: 0,
     });
     myRoom = room; myToken = token;
     socket.join(room.code);
@@ -244,11 +263,16 @@ io.on("connection", (socket) => {
     broadcastState(room);
   }
 
-  socket.on("game:start", ({ seconds }) => {
+  socket.on("game:start", ({ seconds, matches }) => {
     const room = myRoom;
     if (!room || !isHost(room, myToken) || room.phase !== "lobby") return;
     if (room.players.size < MIN_PLAYERS) return;
     if ([30, 60, 120, 0].includes(seconds)) room.postingSeconds = seconds;
+    // 試合数: 妥当な範囲(1〜10)の整数のみ受理。範囲外・不正値は既定3にフォールバック。
+    // UIのプリセット(1/3/5)とは独立 — サーバは「妥当な整数」だけを保証する。
+    room.totalMatches = (Number.isInteger(matches) && matches >= 1 && matches <= 10) ? matches : 3;
+    room.currentMatch = 1;
+    room.players.forEach((p) => { p.cumulative = 0; });
     startPosting(room);
   });
 
@@ -312,7 +336,32 @@ io.on("connection", (socket) => {
   socket.on("game:again", () => {
     const room = myRoom;
     if (!room || !isHost(room, myToken) || room.phase !== "results") return;
+    if (room.currentMatch >= room.totalMatches) return; // 最終戦後は次へ進めない
+    room.currentMatch++;
     startPosting(room);
+  });
+
+  // 最終戦終了後、同じメンバーでもう一度（累積リセット → ロビーへ戻り試合数を再選択）
+  socket.on("game:rematch", () => {
+    const room = myRoom;
+    if (!room || !isHost(room, myToken) || room.phase !== "results") return;
+    if (room.currentMatch !== room.totalMatches) return; // isFinal のときのみ
+    room.players.forEach((p) => { p.cumulative = 0; });
+    room.currentMatch = 1;
+    room.phase = "lobby";
+    room.theme = null;
+    room.results = null;
+    room.galleryOrder = null;
+    broadcastState(room);
+  });
+
+  // ルーム解散（ホストのみ）。全クライアントへ room:closed を通知してルーム削除。
+  socket.on("room:disband", () => {
+    const room = myRoom;
+    if (!room || !isHost(room, myToken)) return;
+    io.to(room.code).emit("room:closed");
+    clearTimeout(room.postingTimer);
+    rooms.delete(room.code);
   });
 
   socket.on("disconnect", () => {

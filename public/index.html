@@ -136,6 +136,13 @@ socket.on("connect", () => {
   } else renderEntry();
 });
 socket.on("room:state", applyState);
+socket.on("room:closed", () => {
+  TOKEN=null; CODE=null; ST=null;
+  sessionStorage.clear();
+  $("#roomBadge").style.display = "none";
+  clearInterval(timerHandle);
+  renderEntry();
+});
 socket.on("post:thrown", ({ total }) => {
   const el = $("#thrownCnt"); if (el) el.textContent = `投函 ${total} 枚`;
   throwPaper();
@@ -200,16 +207,23 @@ function renderLobby(){
     ${isHost ? `
       <label class="fld">投稿フェーズの制限時間</label>
       <div class="seg" id="seg">${[[30,"30秒"],[60,"60秒"],[120,"120秒"],[0,"無制限"]].map(([v,l])=>`<button data-v="${v}" aria-pressed="${v===120}">${l}</button>`).join("")}</div>
+      <label class="fld">試合数</label>
+      <div class="seg" id="segM">${[[1,"1戦"],[3,"3戦"],[5,"5戦"]].map(([v,l])=>`<button data-m="${v}" aria-pressed="${v===3}">${l}</button>`).join("")}</div>
       <hr class="soft">
       <button class="btn pink" id="start" ${n<2?"disabled":""}>ゲーム開始 →</button>`
       : `<p class="muted">ホストの開始を待っています…</p>`}`;
   if (isHost){
     let sec = 120;
+    let matches = 3;
     $("#seg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
       sec = +b.dataset.v;
       $("#seg").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x===b));
     });
-    $("#start").onclick = ()=> socket.emit("game:start", { seconds: sec });
+    $("#segM").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+      matches = +b.dataset.m;
+      $("#segM").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x===b));
+    });
+    $("#start").onclick = ()=> socket.emit("game:start", { seconds: sec, matches });
   }
 }
 
@@ -317,22 +331,55 @@ function renderVoting(){
 
 function renderResults(){
   const R = ST.results;
-  const top = R.table[0];
-  const winners = R.table.filter(r=>r.final===top.final).map(r=>esc(r.name)).join(" ・ ");
+  const M = R.matchInfo;
+  const isFinal = M && M.isFinal;
   const isHost = ST.you && ST.you.isHost;
+  // 当選バナー: 最終戦は累積1位（総合優勝）、途中戦はそのラウンドの最高得点者
+  let bannerLabel, bannerName, bannerPts;
+  if (isFinal){
+    const topC = M.standings[0].cumulative;
+    bannerLabel = "★ 総合優勝 ★";
+    bannerName = M.standings.filter(s=>s.cumulative===topC).map(s=>esc(s.name)).join(" ・ ");
+    bannerPts = `${topC} pt（累積）`;
+  } else {
+    const top = R.table[0];
+    bannerLabel = "★ 当選 ★";
+    bannerName = R.table.filter(r=>r.final===top.final).map(r=>esc(r.name)).join(" ・ ");
+    bannerPts = `${top.final} pt`;
+  }
   app.innerHTML = `
-    <div class="winner"><div class="crown">★ 当選 ★</div><div class="name">${winners}</div><div class="pts">${top.final} pt</div></div>
-    <span class="eyebrow">開票結果</span>
+    ${M ? `<p class="small" style="text-align:center;font-weight:700;color:var(--cyan-dark)">第${M.current}戦 / 全${M.total}戦</p>` : ""}
+    <div class="winner"><div class="crown">${bannerLabel}</div><div class="name">${bannerName}</div><div class="pts">${bannerPts}</div></div>
+    <span class="eyebrow">開票結果（このラウンド）</span>
     <div style="overflow-x:auto;margin-top:6px"><table class="res">
       <thead><tr><th>順位</th><th class="nm">プレイヤー</th><th>投稿</th><th>得票</th><th>順位点</th><th>合計</th></tr></thead>
       <tbody>${R.table.map(r=>`<tr><td class="rk">${r.rank}位</td><td class="nm">${esc(r.name)}<div>${r.tags.map(t=>`<span class="tag ${t.kind}">${esc(t.label)}</span>`).join("")}</div></td><td>${r.postCount}</td><td>${r.total}</td><td>${r.rankPts}</td><td class="fin">${r.final}</td></tr>`).join("")}</tbody>
     </table></div>
+    ${M ? `
+      <hr class="soft">
+      <p class="small" style="font-weight:700;color:var(--ink)">累積順位（全${M.total}戦中 第${M.current}戦終了時点）</p>
+      <div style="overflow-x:auto;margin-top:6px"><table class="res">
+        <thead><tr><th>順位</th><th class="nm">プレイヤー</th><th>今回</th><th>累積</th></tr></thead>
+        <tbody>${M.standings.map((s,i)=>`<tr><td class="rk">${i+1}位</td><td class="nm">${esc(s.name)}</td><td>${s.roundPts}</td><td class="fin">${s.cumulative}</td></tr>`).join("")}</tbody>
+      </table></div>` : ""}
     ${R.reveal ? `
       <hr class="soft">
       <p class="small" style="font-weight:700;color:var(--ink)">答え合わせ — 誰が書いた？</p>
       <ul class="reveal">${R.reveal.map(x=>`<li><span class="who">${esc(x.author)}</span><span>${esc(x.text)}</span><span class="vv">${x.votes}票</span></li>`).join("")}</ul>` : ""}
-    ${isHost ? `<button class="btn cyan" id="again" style="margin-top:8px">同じメンバーで次のお題 →</button>` : `<p class="muted small">ホストが次のラウンドを開始できます。</p>`}`;
-  if (isHost) $("#again").onclick = ()=> socket.emit("game:again");
+    ${isHost ? (isFinal ? `
+      <div class="row" style="margin-top:8px">
+        <button class="btn cyan" id="rematch">同じメンバーでもう一度</button>
+        <button class="btn ghost" id="disband">ルームを解散</button>
+      </div>` : `<button class="btn cyan" id="again" style="margin-top:8px">次のお題へ →</button>`)
+      : `<p class="muted small">${isFinal ? "ホストが次の操作を選びます。" : "ホストが次のラウンドを開始できます。"}</p>`}`;
+  if (isHost){
+    if (isFinal){
+      $("#rematch").onclick = ()=> socket.emit("game:rematch");
+      $("#disband").onclick = ()=> socket.emit("room:disband");
+    } else {
+      $("#again").onclick = ()=> socket.emit("game:again");
+    }
+  }
 }
 
 /* ---------- 投げ込みアニメ（同期演出の受け口） ---------- */

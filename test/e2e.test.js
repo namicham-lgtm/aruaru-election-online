@@ -29,8 +29,8 @@ function emitAck(sock, ev, payload) { return new Promise((r) => sock.emit(ev, pa
   await wait(150);
   assert.strictEqual(states[0].players.length, 4, "lobby 4人");
 
-  // 開始（無制限タイマー）
-  socks[0].emit("game:start", { seconds: 0 });
+  // 開始（無制限タイマー・2戦制）
+  socks[0].emit("game:start", { seconds: 0, matches: 2 });
   await wait(200);
   assert.strictEqual(states[1].phase, "posting", "postingへ遷移");
   assert(states[1].theme, "テーマが配信される");
@@ -96,10 +96,95 @@ function emitAck(sock, ev, payload) { return new Promise((r) => sock.emit(ev, pa
   assert.strictEqual(row("D").final, 0, "全員タイでないがDは最多でない→ペナなし、0pt");
   assert(states[0].results.reveal && states[0].results.reveal.length === 9, "答え合わせ公開");
 
-  // 再戦
+  // --- 複数試合制: 1戦目の matchInfo 検証 ---
+  const m1 = states[0].results.matchInfo;
+  assert.strictEqual(m1.current, 1, "1戦目 current===1");
+  assert.strictEqual(m1.total, 2, "全2戦");
+  assert.strictEqual(m1.isFinal, false, "1戦目は最終戦でない");
+  // 1戦目時点では cumulative === そのラウンドの final
+  const m1final = {};
+  table.forEach((r) => (m1final[r.name] = r.final));
+  for (const s of m1.standings) {
+    assert.strictEqual(s.roundPts, m1final[s.name], `${s.name} roundPts一致`);
+    assert.strictEqual(s.cumulative, m1final[s.name], `${s.name} 1戦目 cumulative=final`);
+  }
+  // standings は cumulative 降順
+  for (let i = 1; i < m1.standings.length; i++) {
+    assert(m1.standings[i - 1].cumulative >= m1.standings[i].cumulative, "standings 降順");
+  }
+
+  // --- 2戦目へ ---
   socks[0].emit("game:again");
   await wait(400);
-  assert.strictEqual(states[2].phase, "posting", "再戦で posting に戻る");
+  assert.strictEqual(states[2].phase, "posting", "2戦目で posting に戻る");
+
+  // 全員1投稿
+  const p2 = {};
+  for (let i = 0; i < 4; i++) {
+    const res = await emitAck(socks[i], "post:add", { text: `R2-${names[i]}` });
+    assert(res.ok, "2戦目 post ok");
+    p2[i] = res.post.id;
+  }
+  socks.forEach((s) => s.emit("post:done"));
+  await wait(300);
+  await wait(4 * 230 + 2200);
+  assert.strictEqual(states[0].phase, "gallery", "2戦目 galleryへ");
+  socks[0].emit("gallery:next");
+  await wait(200);
+  assert.strictEqual(states[3].phase, "voting", "2戦目 votingへ");
+  assert.strictEqual(states[0].allotment, 2, "2戦目 持ち票2");
+  // 各自が他人2本に投票（隣2人）
+  await emitAck(socks[0], "vote:submit", { postIds: [p2[1], p2[2]] });
+  await emitAck(socks[1], "vote:submit", { postIds: [p2[2], p2[3]] });
+  await emitAck(socks[2], "vote:submit", { postIds: [p2[3], p2[0]] });
+  await emitAck(socks[3], "vote:submit", { postIds: [p2[0], p2[1]] });
+  await wait(300);
+  assert.strictEqual(states[0].phase, "results", "2戦目 自動開票");
+
+  const m2 = states[0].results.matchInfo;
+  assert.strictEqual(m2.current, 2, "2戦目 current===2");
+  assert.strictEqual(m2.isFinal, true, "2戦目は最終戦");
+  // cumulative は2戦分の合算
+  const m2round = {};
+  states[0].results.table.forEach((r) => (m2round[r.name] = r.final));
+  for (const s of m2.standings) {
+    assert.strictEqual(
+      s.cumulative, m1final[s.name] + m2round[s.name],
+      `${s.name} 累積=1戦+2戦`
+    );
+  }
+
+  // --- rematch: ロビーへ戻り cumulative リセット ---
+  socks[0].emit("game:rematch");
+  await wait(300);
+  assert.strictEqual(states[1].phase, "lobby", "rematchでロビーへ戻る");
+  // 再開すると cumulative は0から始まる（前2戦の得点を引き継がない）
+  socks[0].emit("game:start", { seconds: 0, matches: 2 });
+  await wait(200);
+  assert.strictEqual(states[0].phase, "posting", "rematch後の再開で posting");
+  const p3 = {};
+  for (let i = 0; i < 4; i++) {
+    const res = await emitAck(socks[i], "post:add", { text: `R3-${names[i]}` });
+    p3[i] = res.post.id;
+  }
+  socks.forEach((s) => s.emit("post:done"));
+  await wait(300);
+  await wait(4 * 230 + 2200);
+  socks[0].emit("gallery:next");
+  await wait(200);
+  await emitAck(socks[0], "vote:submit", { postIds: [p3[1], p3[2]] });
+  await emitAck(socks[1], "vote:submit", { postIds: [p3[2], p3[3]] });
+  await emitAck(socks[2], "vote:submit", { postIds: [p3[3], p3[0]] });
+  await emitAck(socks[3], "vote:submit", { postIds: [p3[0], p3[1]] });
+  await wait(300);
+  assert.strictEqual(states[0].phase, "results", "rematch後 1戦目 自動開票");
+  const m3 = states[0].results.matchInfo;
+  assert.strictEqual(m3.current, 1, "rematch後は第1戦から");
+  const m3round = {};
+  states[0].results.table.forEach((r) => (m3round[r.name] = r.final));
+  for (const s of m3.standings) {
+    assert.strictEqual(s.cumulative, m3round[s.name], `${s.name} cumulativeは0始まり（=今回final）`);
+  }
 
   console.log("e2e: all tests passed");
   socks.forEach((s) => s.close());
