@@ -266,15 +266,6 @@ io.on("connection", (socket) => {
     io.to(room.code).emit("post:thrown", { total: totalPosts(room) });
   });
 
-  socket.on("post:remove", ({ id }) => {
-    const room = myRoom;
-    if (!room || room.phase !== "posting") return;
-    const me = room.players.get(myToken);
-    me.posts = me.posts.filter((p) => p.id !== id);
-    io.to(room.code).emit("post:thrown", { total: totalPosts(room), retracted: true });
-    if (me.socketId) io.to(me.socketId).emit("room:state", snapshotFor(room, myToken));
-  });
-
   socket.on("post:done", () => {
     const room = myRoom;
     if (!room || room.phase !== "posting") return;

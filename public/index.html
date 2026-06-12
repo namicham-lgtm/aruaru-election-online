@@ -224,8 +224,8 @@ function renderPosting(){
     ${done ? `<p class="hint" style="margin-top:14px">投稿を締め切りました。全員の締切を待っています…（${ST.players.filter(p=>p.done).length}/${ST.players.length}）</p>` : `
     <input type="text" id="inp" maxlength="60" placeholder="あるあるを入力 → 投函" style="margin-top:14px">
     <div class="row" style="margin-top:8px"><button class="btn dark" id="add">投函する（1件ずつ）</button></div>`}
-    <ul class="post-list" id="list">${mine.map((p,i)=>`<li><span class="num">${i+1}</span><span class="txt">${esc(p.text)}</span>${done?"":`<button class="del" data-d="${p.id}">✕</button>`}</li>`).join("")}</ul>
-    ${done?"":`<button class="btn pink" id="doneBtn" style="margin-top:8px">投稿を終える →</button>`}`;
+    <ul class="post-list" id="list">${mine.map((p,i)=>`<li><span class="num">${i+1}</span><span class="txt">${esc(p.text)}</span></li>`).join("")}</ul>
+    ${done?"":`<p class="muted small" style="margin-top:6px">投函した投稿は取り消せません。</p><button class="btn pink" id="doneBtn" style="margin-top:8px">投稿を終える →</button>`}`;
   if (!done){
     const inp = $("#inp");
     const send = ()=>{
@@ -233,9 +233,8 @@ function renderPosting(){
       socket.emit("post:add", { text: v }, (res)=>{ if(res && res.ok){ inp.value=""; ST.myPosts.push(res.post); render(); $("#inp")?.focus(); }});
     };
     $("#add").onclick = send;
-    inp.addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
+    inp.addEventListener("keydown", e=>{ if(e.isComposing || e.keyCode === 229) return; if(e.key==="Enter") send(); });
     inp.focus();
-    document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>socket.emit("post:remove",{id:b.dataset.d}));
     $("#doneBtn").onclick = ()=> socket.emit("post:done");
   }
   // タイマー: endsAt をローカル描画
