@@ -186,7 +186,69 @@ function emitAck(sock, ev, payload) { return new Promise((r) => sock.emit(ev, pa
     assert.strictEqual(s.cumulative, m3round[s.name], `${s.name} cumulativeは0始まり（=今回final）`);
   }
 
-  console.log("e2e: all tests passed");
   socks.forEach((s) => s.close());
+
+  // ===== 新ケース1: 投票中の切断 → 猶予後に自動スキップ → results 到達 =====
+  {
+    const dn = ["K1","K2","K3","K4"];
+    const ks = dn.map(() => io(URL, { transports: ["websocket"] }));
+    await Promise.all(ks.map((s) => once(s, "connect")));
+    const kst = dn.map(() => null);
+    ks.forEach((s, i) => s.on("room:state", (st) => (kst[i] = st)));
+    const cr = await emitAck(ks[0], "room:create", { name: dn[0] });
+    const code2 = cr.snapshot.code;
+    for (let i = 1; i < 4; i++) await emitAck(ks[i], "room:join", { code: code2, name: dn[i] });
+    await wait(100);
+    ks[0].emit("game:start", { seconds: 0, matches: 1 });
+    await wait(200);
+    const kp = {};
+    for (let i = 0; i < 4; i++) {
+      const r = await emitAck(ks[i], "post:add", { text: `kp-${dn[i]}` });
+      kp[i] = r.post.id;
+    }
+    ks.forEach((s) => s.emit("post:done"));
+    await wait(300);
+    await wait(4 * 230 + 2200);
+    assert.strictEqual(kst[0].phase, "gallery", "K: galleryへ");
+    ks[0].emit("gallery:next");
+    await wait(200);
+    assert.strictEqual(kst[0].phase, "voting", "K: votingへ");
+    // K4 が切断
+    ks[3].close();
+    await wait(150);
+    // 残り3人が投票（自分以外に2票ずつ）
+    await emitAck(ks[0], "vote:submit", { postIds: [kp[1], kp[2]] });
+    await emitAck(ks[1], "vote:submit", { postIds: [kp[2], kp[3]] });
+    await emitAck(ks[2], "vote:submit", { postIds: [kp[3], kp[0]] });
+    // 猶予(500ms)後に自動で results へ。3s以内に到達することを確認
+    let reached = false;
+    for (let t = 0; t < 30; t++) {
+      if (kst[0].phase === "results") { reached = true; break; }
+      await wait(100);
+    }
+    assert(reached, "切断者の猶予スキップで results に自動到達（3s以内）");
+    ks.slice(0, 3).forEach((s) => s.close());
+  }
+
+  // ===== 新ケース2: ロビーでホストが player:kick → 対象が players から消える =====
+  {
+    const a = io(URL, { transports: ["websocket"] });
+    const b = io(URL, { transports: ["websocket"] });
+    await Promise.all([once(a, "connect"), once(b, "connect")]);
+    let aState = null; a.on("room:state", (st) => (aState = st));
+    let bKicked = false; b.on("room:kicked", () => (bKicked = true));
+    const cr = await emitAck(a, "room:create", { name: "H1" });
+    const code3 = cr.snapshot.code;
+    await emitAck(b, "room:join", { code: code3, name: "G2" });
+    await wait(120);
+    assert.strictEqual(aState.players.length, 2, "kick前は2人");
+    a.emit("player:kick", { targetName: "G2" });
+    await wait(200);
+    assert.strictEqual(aState.players.length, 1, "kickで対象が players から消える");
+    assert(bKicked, "対象に room:kicked が届く");
+    a.close(); b.close();
+  }
+
+  console.log("e2e: all tests passed");
   process.exit(0);
 })().catch((e) => { console.error("E2E FAILED:", e.message); process.exit(1); });

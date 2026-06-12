@@ -7,6 +7,10 @@ function mk(players, voteMap) {
   const ps = Object.entries(players).map(([name, postIds]) => ({ id: name, name, postIds }));
   return computeResults(ps, voteMap);
 }
+function mk2(players, voteMap, voterIds){
+  const ps = Object.entries(players).map(([name, postIds]) => ({ id:name, name, postIds }));
+  return computeResults(ps, voteMap, voterIds);
+}
 const get = (rows, name) => rows.find((r) => r.name === name);
 
 /* --- 1. 会話で検証した4人ラウンド（仕様書の代表例） ---
@@ -87,5 +91,22 @@ assert.strictEqual(voteAllotment(5, 99), 3);
 assert.strictEqual(voteAllotment(7, 99), 5);
 assert.strictEqual(voteAllotment(10, 99), 5, "上限5");
 assert.strictEqual(voteAllotment(6, 3), 3, "他人の投稿数で頭打ち（縮退対策）");
+
+/* --- 7. 投票スキップ者がいる場合の満場一致（voterIds指定） --- */
+{
+  const players = { A:["a1"], B:["b1"], C:["c1","c2"], D:["d1"], E:["e1"] };
+  // D がスキップ。実投票者は A,B,C,E
+  const votes = { b1:["A","C","E"], a1:["B"], c1:["E"].slice(0,0), d1:[] };
+  const r = mk2(players, votes, ["A","B","C","E"]);
+  // B の eligible = [A,C,E] = 3、b1 に3票 → 一点賭け +5
+  assert(get(r,"B").tags.some(t=>t.label.includes("一点賭け")), "スキップ下でも一点賭け成立");
+}
+/* --- 8. eligible が 2 未満ならボーナス不成立 --- */
+{
+  const players = { A:["a1"], B:["b1"], C:["c1"] };
+  const votes = { a1:["B"] };
+  const r = mk2(players, votes, ["B"]); // 実投票者がBのみ → Aのeligible=1
+  assert.strictEqual(get(r,"A").bonus, 0, "eligible<2はボーナスなし");
+}
 
 console.log("scoring: all tests passed");

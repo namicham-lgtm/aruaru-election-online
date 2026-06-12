@@ -23,6 +23,8 @@ const RECOMMENDED_PLAYERS = 4;
 const MAX_PLAYERS = 12;
 const COLLECT_MS_PER_PAPER = 230;
 const REVEAL_AUTHORS_IN_RESULTS = true; // レビュー §9-5 提案: 開票で投稿者を公開
+// 投票フェーズで切断/離脱したプレイヤーを自動スキップするまでの猶予（テスト用に可変）
+const VOTE_GRACE_MS = process.env.VOTE_GRACE_MS ? Number(process.env.VOTE_GRACE_MS) : 45000;
 
 const app = express();
 app.use(express.static(path.join(__dirname, "public")));
@@ -42,13 +44,15 @@ function makeRoom(code) {
     themeHistory: [],
     totalMatches: 3,
     currentMatch: 1,
+    hostToken: null,    // ホストの token（作成時に設定。切断/離脱で移譲）
     postingSeconds: 120,
     postingEndsAt: null,
     postingTimer: null,
-    players: new Map(), // token -> {token, name, socketId|null, posts:[{id,text}], doneRound, votedIds|null}
+    players: new Map(), // token -> {token, name, socketId|null, posts, doneRound, votedIds|null, left, skipped, cumulative}
     votes: {},          // postId -> token[]
     galleryOrder: null, // shuffled post ids (全員同じ並び)
     results: null,
+    graceTimers: new Map(), // token -> Timeout（投票猶予タイマー）
   };
 }
 const roomOf = (code) => rooms.get(code);
@@ -71,7 +75,10 @@ function snapshotFor(room, token) {
   const players = [...room.players.values()].map((p) => ({
     name: p.name,
     connected: !!p.socketId,
-    done: room.phase === "voting" ? !!p.votedIds : !!p.doneRound,
+    left: !!p.left,
+    done: room.phase === "voting"
+      ? (!!p.votedIds || !!p.skipped || !!p.left)
+      : (!!p.doneRound || !!p.left),
   }));
   const base = {
     code: room.code,
@@ -97,6 +104,7 @@ function snapshotFor(room, token) {
     if (room.phase === "voting" && me) {
       base.allotment = allotmentFor(room, token);
       base.voted = !!me.votedIds;
+      base.skipped = !!me.skipped;
       base.lowPostWarning = lowPostWarning(room);
     }
   }
@@ -105,7 +113,35 @@ function snapshotFor(room, token) {
   }
   return base;
 }
-const isHost = (room, token) => [...room.players.keys()][0] === token;
+const isHost = (room, token) => room.hostToken === token;
+// ホストが切断/離脱したら、接続中かつ left でない最初のプレイヤーへ移譲（戻さない）
+function reassignHostIfNeeded(room) {
+  const h = room.players.get(room.hostToken);
+  if (h && h.socketId && !h.left) return;
+  for (const [tk, p] of room.players) {
+    if (p.socketId && !p.left) { room.hostToken = tk; return; }
+  }
+}
+// 投稿フェーズ完了判定: 全員が done / left / 切断中なら完了扱い
+function postingComplete(room) {
+  return [...room.players.values()].every((p) => p.doneRound || p.left || !p.socketId);
+}
+function clearVoteGrace(room, token) {
+  const t = room.graceTimers.get(token);
+  if (t) { clearTimeout(t); room.graceTimers.delete(token); }
+}
+function startVoteGrace(room, token) {
+  if (room.graceTimers.has(token)) return;
+  const t = setTimeout(() => {
+    room.graceTimers.delete(token);
+    const p = room.players.get(token);
+    if (!p || room.phase !== "voting" || p.votedIds || p.skipped) return;
+    p.skipped = true;
+    broadcastState(room);
+    maybeFinishVoting(room);
+  }, VOTE_GRACE_MS);
+  room.graceTimers.set(token, t);
+}
 const totalPosts = (room) =>
   [...room.players.values()].reduce((s, p) => s + p.posts.length, 0);
 
@@ -144,7 +180,14 @@ function broadcastState(room) {
 async function startPosting(room) {
   room.theme = await generateTheme(room.code, room.themeHistory);
   room.themeHistory.push(room.theme);
-  room.players.forEach((p) => { p.posts = []; p.doneRound = false; p.votedIds = null; });
+  // 離脱者は新しい試合の開始時に room から削除し、待ち判定の対象外にする
+  room.graceTimers.forEach((t) => clearTimeout(t));
+  room.graceTimers.clear();
+  [...room.players.entries()].forEach(([tk, p]) => { if (p.left) room.players.delete(tk); });
+  reassignHostIfNeeded(room);
+  room.players.forEach((p) => {
+    p.posts = []; p.doneRound = false; p.votedIds = null; p.skipped = false;
+  });
   room.votes = {};
   room.galleryOrder = null;
   room.results = null;
@@ -173,14 +216,21 @@ function endPosting(room) {
 }
 function maybeFinishVoting(room) {
   const allVoted = [...room.players.values()].every(
-    (p) => p.votedIds || allotmentFor(room, p.token) === 0
+    (p) => p.votedIds || p.skipped || p.left || allotmentFor(room, p.token) === 0
   );
   if (!allVoted) return;
+  // 投票猶予タイマーが残っていれば全解除
+  room.graceTimers.forEach((t) => clearTimeout(t));
+  room.graceTimers.clear();
   // 採点（サーバ側・仕様 §4）
   const players = [...room.players.entries()].map(([token, p]) => ({
     id: token, name: p.name, postIds: p.posts.map((x) => x.id),
   }));
-  const rows = computeResults(players, room.votes);
+  // 実際に投票したプレイヤーのみを「全員」の母数にする（スキップ/離脱は除外）
+  const voterIds = [...room.players.entries()]
+    .filter(([, p]) => Array.isArray(p.votedIds))
+    .map(([tk]) => tk);
+  const rows = computeResults(players, room.votes, voterIds);
   const voteCount = {};
   Object.entries(room.votes).forEach(([id, v]) => (voteCount[id] = v.length));
   // 累積スコア: ラウンド採点確定時に final を加算（id=token で対応付け）
@@ -237,6 +287,7 @@ io.on("connection", (socket) => {
     if (token && room.players.has(token)) {
       const p = room.players.get(token);
       p.socketId = socket.id;
+      clearVoteGrace(room, token); // 再接続したら投票猶予を解除
       myRoom = room; myToken = token;
       socket.join(room.code);
       cb({ ok: true, token, snapshot: snapshotFor(room, token) });
@@ -255,8 +306,10 @@ io.on("connection", (socket) => {
       return cb({ error: "同じ名前の参加者がいます" });
     const token = crypto.randomBytes(12).toString("hex");
     room.players.set(token, {
-      token, name: clean, socketId: socket.id, posts: [], doneRound: false, votedIds: null, cumulative: 0,
+      token, name: clean, socketId: socket.id, posts: [], doneRound: false,
+      votedIds: null, left: false, skipped: false, cumulative: 0,
     });
+    if (!room.hostToken) room.hostToken = token; // 最初の参加者がホスト
     myRoom = room; myToken = token;
     socket.join(room.code);
     cb({ ok: true, token, snapshot: snapshotFor(room, token) });
@@ -295,7 +348,7 @@ io.on("connection", (socket) => {
     if (!room || room.phase !== "posting") return;
     room.players.get(myToken).doneRound = true;
     broadcastState(room);
-    if ([...room.players.values()].every((p) => p.doneRound)) endPosting(room);
+    if (postingComplete(room)) endPosting(room);
   });
 
   socket.on("gallery:next", () => {
@@ -303,7 +356,16 @@ io.on("connection", (socket) => {
     if (!room || !isHost(room, myToken) || room.phase !== "gallery") return;
     room.players.forEach((p) => (p.doneRound = false));
     room.phase = "voting";
+    // 持ち票0のプレイヤーは投票対象なし → 自動スキップ
+    room.players.forEach((p, tk) => {
+      p.skipped = allotmentFor(room, tk) === 0;
+    });
     broadcastState(room);
+    // 切断中/離脱のプレイヤーには猶予タイマーを開始
+    room.players.forEach((p, tk) => {
+      if (!p.skipped && !p.votedIds && (!p.socketId || p.left)) startVoteGrace(room, tk);
+    });
+    maybeFinishVoting(room); // 全員スキップ/離脱なら即終了
   });
 
   // 投票（複数選択 → 一括確定。サーバ側で全制約を検証 — 仕様 §3⑤）
@@ -322,6 +384,7 @@ io.on("connection", (socket) => {
       if (myIds.has(id)) return cb({ error: "自分の投稿には投票できません" });
     }
     me.votedIds = ids;
+    clearVoteGrace(room, myToken);
     ids.forEach((id) => { (room.votes[id] = room.votes[id] || []).push(myToken); });
     cb({ ok: true });
     // 同期演出: 誰かが投票を確定するたび全員の箱に投函
@@ -346,7 +409,12 @@ io.on("connection", (socket) => {
     const room = myRoom;
     if (!room || !isHost(room, myToken) || room.phase !== "results") return;
     if (room.currentMatch !== room.totalMatches) return; // isFinal のときのみ
-    room.players.forEach((p) => { p.cumulative = 0; });
+    // 離脱者を除去してホストを再確定
+    room.graceTimers.forEach((t) => clearTimeout(t));
+    room.graceTimers.clear();
+    [...room.players.entries()].forEach(([tk, p]) => { if (p.left) room.players.delete(tk); });
+    reassignHostIfNeeded(room);
+    room.players.forEach((p) => { p.cumulative = 0; p.skipped = false; p.votedIds = null; p.doneRound = false; });
     room.currentMatch = 1;
     room.phase = "lobby";
     room.theme = null;
@@ -364,19 +432,56 @@ io.on("connection", (socket) => {
     rooms.delete(room.code);
   });
 
+  // キック（ホストのみ）。ロビー中は削除、ゲーム中は left 扱いで待ちから外す。
+  socket.on("player:kick", ({ targetName }) => {
+    const room = myRoom;
+    if (!room || !isHost(room, myToken)) return;
+    let targetTk = null, target = null;
+    for (const [tk, p] of room.players) {
+      if (p.name === targetName) { targetTk = tk; target = p; break; }
+    }
+    if (!target || targetTk === room.hostToken) return; // 自分(ホスト)は対象外
+    const sid = target.socketId;
+    if (room.phase === "lobby") {
+      room.players.delete(targetTk);
+    } else {
+      target.left = true; // 投稿/投票の待ちから外す（既存の投稿・票は有効のまま）
+      clearVoteGrace(room, targetTk);
+    }
+    if (sid) io.to(sid).emit("room:kicked");
+    broadcastState(room);
+    // キックで詰みが解ける場合に備えて再評価
+    if (room.phase === "posting" && postingComplete(room)) endPosting(room);
+    if (room.phase === "voting") maybeFinishVoting(room);
+  });
+
   socket.on("disconnect", () => {
     const room = myRoom;
     if (!room) return;
     const me = room.players.get(myToken);
     if (me) me.socketId = null;
-    // ロビー中の切断は離脱扱い
+    // ロビー中の切断は離脱扱い（room から削除）
     if (room.phase === "lobby" && me) room.players.delete(myToken);
-    if (room.players.size === 0) {
+    // ホストが切断/離脱したら移譲
+    reassignHostIfNeeded(room);
+    // 接続中プレイヤーが0になったらルーム削除
+    const connected = [...room.players.values()].filter((p) => p.socketId).length;
+    if (connected === 0) {
       clearTimeout(room.postingTimer);
+      room.graceTimers.forEach((t) => clearTimeout(t));
+      room.graceTimers.clear();
       rooms.delete(room.code);
       return;
     }
+    // 投票中の切断 → 猶予タイマー開始
+    if (room.phase === "voting" && me && !me.votedIds && !me.skipped && !me.left) {
+      startVoteGrace(room, myToken);
+    }
     broadcastState(room);
+    // 投稿フェーズ: 残り全員が完了/離脱/切断なら締める
+    if (room.phase === "posting" && postingComplete(room)) endPosting(room);
+    // 投票フェーズ: 切断で残り全員が完了相当になったら締める
+    if (room.phase === "voting") maybeFinishVoting(room);
   });
 });
 

@@ -4,7 +4,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 
 const server = spawn("node", [path.join(__dirname, "..", "server.js")], {
-  env: { ...process.env, PORT: "3100" },
+  env: { ...process.env, PORT: "3100", VOTE_GRACE_MS: "500" },
   stdio: "ignore",
 });
 setTimeout(() => {
