@@ -162,6 +162,7 @@ socket.on("room:closed", () => {
 socket.on("post:thrown", ({ total }) => {
   const el = $("#thrownCnt"); if (el) el.textContent = `投函 ${total} 枚`;
   throwPaper();
+  window.SFX && SFX.throw();
 });
 socket.on("vote:cast", ({ voted, total }) => {
   const el = $("#voteProg"); if (el) el.textContent = `投票済み ${voted} / ${total} 人`;
@@ -300,7 +301,7 @@ function renderCollect(){
   // 全クライアント同時の集約演出（サーバが gallery へ自動遷移）
   if (!REDUCED){
     const n = Math.min(ST.totalThrown, 40);
-    for (let i=0;i<n;i++) setTimeout(()=>throwPaper(i%2===1), i*230);
+    for (let i=0;i<n;i++) setTimeout(()=>{ throwPaper(i%2===1); if (i % 3 === 0) window.SFX && SFX.throw(); }, i*230);
   }
 }
 
@@ -410,7 +411,6 @@ function renderResults(){
 
 /* ---------- 投げ込みアニメ（同期演出の受け口） ---------- */
 function throwPaper(alt){
-  window.SFX && SFX.throw();
   if (REDUCED) return;
   const stage = $("#stage"), box = $("#bbox");
   if (!stage || !box) return;
