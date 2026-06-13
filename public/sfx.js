@@ -113,6 +113,23 @@
       const t = ctx.currentTime;
       tone(523.25, t, 0.09, { type: "sine", gain: 0.18, release: 0.05 });
     },
+    // 当確スタンプ音: 短い低音ドン（180→70Hz）＋アタックのクリック 約0.12s
+    stamp() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(70, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.6, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      osc.connect(g).connect(master);
+      osc.start(t);
+      osc.stop(t + 0.14);
+      noise(t, 0.03, { gain: 0.25, lp: 2000 }); // 押下のクリック
+    },
     // 投票確定: 明るい2音チャイム E5→A5 約0.3s
     vote() {
       if (!ready()) return;

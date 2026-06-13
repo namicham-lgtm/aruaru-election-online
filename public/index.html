@@ -157,6 +157,26 @@
   .pop-in>*:nth-child(8){animation-delay:420ms}
   .pop-in>*:nth-child(9){animation-delay:480ms}
   .pop-in>*:nth-child(n+10){animation-delay:540ms}
+  /* ---- 選挙特番: 速報テロップ・当確/落選スタンプ・実況吹き出し ---- */
+  .telop{background:var(--stage);border:2.5px solid var(--ink);border-radius:10px;box-shadow:3px 3px 0 rgba(0,0,0,.3);overflow:hidden;margin-bottom:12px;padding:6px 0;white-space:nowrap}
+  .telop-track{display:inline-block;white-space:nowrap;font-family:"Zen Kaku Gothic Antique";font-weight:900;color:var(--yellow);font-size:14px;letter-spacing:.04em;will-change:transform;animation:telop 16s linear infinite}
+  @keyframes telop{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .stamp{position:absolute;display:flex;align-items:center;justify-content:center;font-family:"Zen Kaku Gothic Antique";font-weight:900;pointer-events:none}
+  .stamp-toukaku{top:-12px;right:-8px;width:60px;height:60px;border-radius:9px;background:var(--pink);color:#fff;border:2.5px solid var(--pink);box-shadow:inset 0 0 0 2.5px #fff;font-size:21px;letter-spacing:.06em;transform:rotate(-8deg);z-index:5}
+  .stamp-toukaku.press{animation:stampIn .25s cubic-bezier(.34,1.56,.64,1) both}
+  @keyframes stampIn{0%{transform:rotate(-8deg) scale(2.2);opacity:0}55%{opacity:1}100%{transform:rotate(-8deg) scale(1);opacity:1}}
+  .stamp-rakusen{display:inline-flex;align-items:center;margin-left:7px;padding:1px 7px;font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:12px;border-radius:6px;color:var(--ink-soft);background:rgba(255,255,255,.5);border:2px solid var(--ink-soft);opacity:.55;transform:rotate(4deg);vertical-align:middle}
+  .win-say{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0 2px}
+  .win-say .bbox.mini{width:54px;height:44px}
+  .win-say .bbox.mini::before{top:7px;width:30px;height:5px}
+  .mascot-bubble{position:absolute;top:8px;left:50%;transform:translateX(-50%);max-width:90%;background:#fff;color:var(--ink);border:2.5px solid var(--ink);border-radius:12px;box-shadow:3px 3px 0 rgba(0,0,0,.28);padding:6px 13px;font-weight:700;font-size:13px;text-align:center;z-index:4;white-space:nowrap}
+  .mascot-bubble::after{content:"";position:absolute;bottom:-11px;left:50%;transform:translateX(-50%);border-left:9px solid transparent;border-right:9px solid transparent;border-top:11px solid var(--ink)}
+  .mascot-bubble::before{content:"";position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);border-left:6px solid transparent;border-right:6px solid transparent;border-top:7px solid #fff;z-index:1}
+  .mascot-bubble.pop{animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both}
+  /* win-say の吹き出しは左向きしっぽ・静的配置 */
+  .win-say .mascot-bubble{position:static;transform:none;max-width:none;white-space:normal}
+  .win-say .mascot-bubble::after{top:50%;bottom:auto;left:-11px;transform:translateY(-50%);border-top:9px solid transparent;border-bottom:9px solid transparent;border-right:11px solid var(--ink);border-left:0}
+  .win-say .mascot-bubble::before{top:50%;bottom:auto;left:-6px;transform:translateY(-50%);border-top:6px solid transparent;border-bottom:6px solid transparent;border-right:7px solid #fff;border-left:0}
   /* ---- モーダル ---- */
   .modal-overlay{position:fixed;inset:0;z-index:100;background:rgba(36,19,56,.82);display:flex;align-items:center;justify-content:center;padding:16px}
   .modal-card{background:var(--card);color:var(--ink);border-radius:18px;border:2.5px solid var(--ink);box-shadow:4px 4px 0 rgba(0,0,0,.35);max-width:520px;width:100%;max-height:82vh;overflow-y:auto;padding:22px 20px 18px;position:relative}
@@ -189,6 +209,36 @@ const esc = (s)=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // マスコット「投函箱くん」の顔（目+笑い口）。マークアップのみ。
 const MASCOT = `<svg class="mascot" viewBox="0 0 92 70" aria-hidden="true"><g class="eyes"><circle cx="34" cy="36" r="7" fill="#fff"/><circle cx="58" cy="36" r="7" fill="#fff"/><circle cx="35" cy="37" r="3.4" fill="#241338"/><circle cx="59" cy="37" r="3.4" fill="#241338"/></g><path d="M33 47 Q46 56 59 47" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/></svg>`;
+
+// マスコット実況の定型文（各フェーズ3種以上からランダム）
+const MASCOT_LINES = {
+  posting: ["どんどん投函してね！","お、いまの自信作？","ひらめいたら即・投函！","迷ったら全部出しちゃえ〜"],
+  collect: ["ぜんぶ集めてるよ〜","大接戦の予感…！","どれが誰の…？ワクワク"],
+  voting:  ["みんな投票中だよ〜","共感した一票、届いた？","開票までもう少し！"],
+  results: ["大接戦の予感…！","開票、開票〜！","ドキドキの瞬間だね"],
+  win:     ["おめでとう！！","みごと当選〜！","さすがの貫禄！"]
+};
+const pickLine = (key)=>{ const a = MASCOT_LINES[key]||[]; return a[Math.floor(Math.random()*a.length)]||""; };
+// .stage 内に置く実況吹き出し（下向きしっぽ）
+function mascotBubble(key){
+  const l = pickLine(key);
+  return l ? `<div class="mascot-bubble pop">${esc(l)}</div>` : "";
+}
+// 当確スタンプを表彰台1位へ押す（animate=false は即時表示）
+function injectToukaku(animate){
+  const ped1 = document.querySelector(".ped1");
+  if (!ped1 || ped1.querySelector(".stamp-toukaku")) return;
+  const s = document.createElement("div");
+  s.className = "stamp stamp-toukaku" + (animate ? " press" : "");
+  s.textContent = "当確";
+  ped1.appendChild(s);
+}
+// 当確後のマスコット実況（左向きしっぽ・横並び）
+function injectWinSay(animate){
+  const ws = document.getElementById("winSay");
+  if (!ws) return;
+  ws.innerHTML = `<div class="win-say"><div class="bbox mini">${MASCOT}</div><div class="mascot-bubble lt ${animate?"pop":""}">${esc(pickLine("win"))}</div></div>`;
+}
 
 const HOWTO_PAGES = [
   { title: "あるある選挙とは",
@@ -435,7 +485,7 @@ function renderPosting(){
   app.innerHTML = `
     <div class="theme-box"><div class="lbl">THEME</div><div class="t">${esc(ST.theme)}</div></div>
     <div class="timer" id="tmr">${ST.postingEndsAt ? "" : "∞"}</div>
-    <div class="stage" id="stage" style="min-height:120px"><div class="bbox" id="bbox">${MASCOT}<span class="face">投函</span></div></div>
+    <div class="stage" id="stage" style="min-height:120px">${mascotBubble("posting")}<div class="bbox" id="bbox">${MASCOT}<span class="face">投函</span></div></div>
     <div class="thrown-cnt" id="thrownCnt">投函 ${ST.totalThrown ?? 0} 枚</div>
     ${done ? `<p class="hint" style="margin-top:14px">投稿を締め切りました。全員の締切を待っています…（${ST.players.filter(p=>p.done).length}/${ST.players.length}）</p>` : `
     <input type="text" id="inp" maxlength="60" placeholder="あるあるを入力 → 投函" style="margin-top:14px">
@@ -470,7 +520,7 @@ function renderCollect(){
   app.innerHTML = `
     <span class="eyebrow">Collecting</span>
     <h2 style="font-size:21px;margin-top:4px">開票箱に集まっています…</h2>
-    <div class="stage" id="stage" style="min-height:200px;margin-top:12px"><div class="bbox sway" id="bbox">${MASCOT}<span class="face">投函</span></div></div>
+    <div class="stage" id="stage" style="min-height:200px;margin-top:12px">${mascotBubble("collect")}<div class="bbox sway" id="bbox">${MASCOT}<span class="face">投函</span></div></div>
     <div class="thrown-cnt" id="thrownCnt">全 ${ST.totalThrown} 枚</div>
     <p class="muted small" style="color:var(--ink-soft);text-align:center">まもなく一覧が公開されます</p>`;
   // 全クライアント同時の集約演出（サーバが gallery へ自動遷移）
@@ -503,7 +553,7 @@ function renderVoting(){
         <h2 style="font-size:21px;margin:0;flex:1">${ST.skipped ? "投票スキップ" : "投票完了"}</h2>
         <button class="btn ghost sm" id="howtoVote" style="width:auto;padding:7px 12px" aria-label="得点のヒミツ">？</button>
       </div>
-      <div class="stage" style="min-height:150px;margin-top:12px"><div class="bbox" id="bbox">${MASCOT}<span class="face">投票</span></div></div>
+      <div class="stage" style="min-height:150px;margin-top:12px">${mascotBubble("voting")}<div class="bbox" id="bbox">${MASCOT}<span class="face">投票</span></div></div>
       ${ST.skipped ? `<p class="warnbox" style="text-align:center">今回の投票はスキップされました</p>` : ""}
       <p class="hint" id="voteProg" style="text-align:center">投票済み ${ST.players.filter(p=>p.done).length} / ${ST.players.length} 人</p>
       <p class="muted small" style="color:var(--ink-soft)">全員の投票が揃うと自動で開票します。</p>`;
@@ -567,6 +617,19 @@ function renderResults(){
     ? `<div class="ribbon">総合優勝</div>`
     : `<div class="match-big">第${M ? M.current : 1}戦 <small>/ 全${M ? M.total : 1}戦</small></div>`;
 
+  // 速報テロップ: 投票総数は受信済み table の得票合計から算出
+  const totalVotes = R.table.reduce((a,r)=>a + (r.total||0), 0);
+  const telopMsg = `開票速報 ▶ 第${M ? M.current : 1}戦／全${M ? M.total : 1}戦 ▶ お題「${esc(ST.theme)}」 ▶ 投票総数 ${totalVotes}票`;
+  const telopHtml = `<div class="telop"><span class="telop-track">${telopMsg}　　　${telopMsg}　　　</span></div>`;
+
+  // 落選スタンプ: 最終戦のみ、累積最下位（全員同点は対象外）
+  const rakusen = new Set();
+  if (isFinal && M && M.standings && M.standings.length){
+    const vals = M.standings.map(s=>s.cumulative);
+    const mn = Math.min(...vals), mx = Math.max(...vals);
+    if (mn < mx) M.standings.forEach(s=>{ if (s.cumulative === mn) rakusen.add(s.name); });
+  }
+
   const maxVotes = R.reveal ? Math.max(0, ...R.reveal.map(x=>x.votes)) : -1;
 
   const detailHtml = `
@@ -580,7 +643,7 @@ function renderResults(){
       <p class="small" style="font-weight:700;color:var(--ink)">累積順位（全${M.total}戦中 第${M.current}戦終了時点）</p>
       <div style="overflow-x:auto;margin-top:6px"><table class="res">
         <thead><tr><th>順位</th><th class="nm">プレイヤー</th><th>今回</th><th>累積</th></tr></thead>
-        <tbody class="pop-in">${M.standings.map((s,i)=>`<tr><td class="rk">${i+1}位</td><td class="nm">${esc(s.name)}</td><td>${s.roundPts}</td><td class="fin"><span class="cup-late" data-to="${s.cumulative}">0</span></td></tr>`).join("")}</tbody>
+        <tbody class="pop-in">${M.standings.map((s,i)=>`<tr><td class="rk">${i+1}位</td><td class="nm">${esc(s.name)}${rakusen.has(s.name)?`<span class="stamp-rakusen">落選</span>`:""}</td><td>${s.roundPts}</td><td class="fin"><span class="cup-late" data-to="${s.cumulative}">0</span></td></tr>`).join("")}</tbody>
       </table></div>` : ""}
     ${R.reveal ? `
       <hr class="soft">
@@ -594,14 +657,16 @@ function renderResults(){
       : `<p class="muted small">${isFinal ? "ホストが次の操作を選びます。" : "ホストが次のラウンドを開始できます。"}</p>`}`;
 
   app.innerHTML = `
+    ${telopHtml}
     <div id="rIntro" class="r-intro">
       <span class="eyebrow">開票中</span>
-      <div class="stage" style="min-height:160px;margin-top:12px"><div class="bbox sway">${MASCOT}<span class="face">開票</span></div></div>
+      <div class="stage" style="min-height:160px;margin-top:12px">${mascotBubble("results")}<div class="bbox sway">${MASCOT}<span class="face">開票</span></div></div>
       <p class="muted small">集計しています…</p>
     </div>
     <div id="rShow" style="display:none">
       ${headerHtml}
       <div class="podium">${pedHtml}</div>
+      <div id="winSay"></div>
       <div id="rDetail" class="r-detail">${detailHtml}</div>
     </div>`;
 
@@ -625,6 +690,8 @@ function renderResults(){
       b.style.height = PED_H[b.parentElement.dataset.rank] + "px";
     });
     document.querySelectorAll(".cup,.cup-late").forEach(c=> c.textContent = c.dataset.to);
+    injectToukaku(false);  // 当確スタンプ即時表示
+    injectWinSay(false);   // 実況も即時表示
     bindControls();
     return;
   }
@@ -640,8 +707,11 @@ function renderResults(){
       const cup = ped.querySelector(".cup"); if (cup) countUp(cup, +cup.dataset.to, 800);
       window.SFX && SFX.tap();
       if (rk === 1){
+        injectToukaku(true);            // 当確スタンプを押す
+        window.SFX && SFX.stamp();      // 押下と同時に低音ドン
         window.SFX && SFX.fanfare();
         if (isFinal) launchConfetti();
+        injectWinSay(true);             // 当確後のマスコット実況
         const det = $("#rDetail");
         if (det){
           det.classList.add("show"); // .pop-in 子要素がここから出現
