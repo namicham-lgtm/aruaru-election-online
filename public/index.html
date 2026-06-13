@@ -265,6 +265,28 @@ function render(){
 }
 
 function renderEntry(){
+  const inviteCode = (()=>{ try { return new URLSearchParams(location.search).get("room") || ""; } catch(e){ return ""; } })();
+  const validInvite = /^[0-9A-Fa-f]{4}$/.test(inviteCode);
+  if (validInvite){
+    app.innerHTML = `
+      <span class="eyebrow">Entry</span>
+      <h2 style="font-size:22px;margin-top:4px">ROOM ${esc(inviteCode.toUpperCase())} に参加します</h2>
+      <label class="fld">名前</label>
+      <input type="text" id="nm" maxlength="12" placeholder="ニックネーム">
+      <button class="btn pink" id="join" style="margin-top:14px">参加する →</button>
+      <div class="err" id="err"></div>`;
+    const after = (res)=>{
+      if (res.error) { $("#err").textContent = res.error; return; }
+      TOKEN = res.token; CODE = res.snapshot.code;
+      sessionStorage.setItem("aru_token", TOKEN);
+      sessionStorage.setItem("aru_code", CODE);
+      history.replaceState(null, "", location.pathname);
+      applyState(res.snapshot);
+    };
+    $("#join").onclick = ()=> socket.emit("room:join", { code: inviteCode, name: $("#nm").value }, after);
+    $("#nm").focus();
+    return;
+  }
   app.innerHTML = `
     <span class="eyebrow">Entry</span>
     <h2 style="font-size:22px;margin-top:4px">ルームを作る / 参加する</h2>
@@ -298,6 +320,7 @@ function renderLobby(){
     <span class="eyebrow">Lobby · ROOM ${esc(ST.code)}</span>
     <h2 style="font-size:22px;margin-top:4px">参加者 ${n}人</h2>
     <p class="muted small">このコードを共有して集合。${n < ST.recommended ? `<b>推奨は${ST.recommended}人以上</b>です。` : ""}</p>
+    <button class="btn ghost sm" id="copyLink" style="margin-bottom:4px">🔗 招待リンクをコピー</button>
     <ul class="plist pop-in">${ST.players.map(p=>`<li><span class="dot ${p.connected?"":"off"}"></span>${esc(p.name)}${p.left?`<span class="left-tag">退出</span>`:""}${(isHost && p.name!==ST.you.name)?`<button class="kick" data-k="${esc(p.name)}" aria-label="キック">✕</button>`:""}</li>`).join("")}</ul>
     ${isHost ? `
       <label class="fld">投稿フェーズの制限時間</label>
@@ -320,6 +343,18 @@ function renderLobby(){
     });
     $("#start").onclick = ()=> socket.emit("game:start", { seconds: sec, matches });
     document.querySelectorAll(".kick").forEach(b=>b.onclick=()=>socket.emit("player:kick",{targetName:b.dataset.k}));
+  }
+  const copyBtn = $("#copyLink");
+  if (copyBtn){
+    copyBtn.onclick = ()=>{
+      const url = `${location.origin}/?room=${ST.code}`;
+      const done = ()=>{ copyBtn.textContent = "✅ コピーしました！"; setTimeout(()=>{ copyBtn.textContent = "🔗 招待リンクをコピー"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(done).catch(()=>{ prompt("URLをコピーしてください", url); });
+      } else {
+        prompt("URLをコピーしてください", url);
+      }
+    };
   }
 }
 
