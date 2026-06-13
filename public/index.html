@@ -648,7 +648,8 @@ function renderResults(){
     ${R.reveal ? `
       <hr class="soft">
       <p class="small" style="font-weight:700;color:var(--ink)">答え合わせ — 誰が書いた？</p>
-      <ul class="reveal pop-in">${R.reveal.map(x=>`<li><span class="who">${esc(x.author)}</span><span>${esc(x.text)}</span>${(x.votes===maxVotes && maxVotes>0)?`<span class="mvp-sticker">MVPあるある</span>`:""}<span class="vv">${x.votes}票</span></li>`).join("")}</ul>` : ""}
+      <ul class="reveal pop-in">${R.reveal.map(x=>`<li><span class="who">${esc(x.author)}</span><span>${esc(x.text)}</span>${(x.votes===maxVotes && maxVotes>0)?`<span class="mvp-sticker">MVPあるある</span>`:""}<span class="vv">${x.votes}票</span></li>`).join("")}</ul>
+      <button class="btn ghost" id="saveCard" style="margin-top:8px">🖼️ ベストあるあるを保存</button>` : ""}
     ${isHost ? (isFinal ? `
       <div class="row" style="margin-top:8px">
         <button class="btn cyan" id="rematch">同じメンバーでもう一度</button>
@@ -679,6 +680,7 @@ function renderResults(){
       $("#again") && ($("#again").onclick = ()=> socket.emit("game:again"));
     }
   };
+  const bindShare = ()=>{ const b = $("#saveCard"); if (b) b.onclick = ()=> generateShareCard(); };
 
   // reduced-motion: 全演出スキップで最終状態を即時表示
   if (REDUCED){
@@ -693,6 +695,7 @@ function renderResults(){
     injectToukaku(false);  // 当確スタンプ即時表示
     injectWinSay(false);   // 実況も即時表示
     bindControls();
+    bindShare();
     return;
   }
 
@@ -717,6 +720,7 @@ function renderResults(){
           det.classList.add("show"); // .pop-in 子要素がここから出現
           det.querySelectorAll(".cup-late").forEach(c=> countUp(c, +c.dataset.to, 800));
           bindControls();
+          bindShare();
         }
       }
     }, idx*600));
@@ -754,6 +758,157 @@ function launchConfetti(){
   }
   document.body.appendChild(box);
   setTimeout(()=> box.remove(), 3200);
+}
+
+/* ---------- ベストあるある シェア画像（Canvas 1200x630） ---------- */
+const SHARE_FONT = '"Zen Kaku Gothic Antique", sans-serif';
+function rrPath(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+function wrapByChar(ctx, text, maxWidth){
+  const lines = []; let cur = "";
+  for (const ch of [...text]){
+    const test = cur + ch;
+    if (cur && ctx.measureText(test).width > maxWidth){ lines.push(cur); cur = ch; }
+    else cur = test;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+// 自動縮小（基準＋2段階）。maxLines を超えない最大サイズを選ぶ
+function layoutText(ctx, text, maxWidth, maxLines){
+  const sizes = [58, 46, 36];
+  for (const size of sizes){
+    ctx.font = `900 ${size}px ${SHARE_FONT}`;
+    const lines = wrapByChar(ctx, text, maxWidth);
+    if (lines.length <= maxLines) return { size, lines };
+  }
+  const size = sizes[sizes.length-1];
+  ctx.font = `900 ${size}px ${SHARE_FONT}`;
+  let lines = wrapByChar(ctx, text, maxWidth);
+  if (lines.length > maxLines){ lines = lines.slice(0, maxLines); lines[maxLines-1] = lines[maxLines-1].slice(0, -1) + "…"; }
+  return { size, lines };
+}
+async function generateShareCard(){
+  const R = ST && ST.results;
+  if (!R || !R.reveal || !R.reveal.length) return;
+  // 最多得票（同数は候補からランダムに1本）
+  const maxV = Math.max(...R.reveal.map(x=>x.votes));
+  const cands = R.reveal.filter(x=>x.votes === maxV);
+  const best = cands[Math.floor(Math.random()*cands.length)];
+  const theme = ST.theme || "";
+
+  // フォント確実化
+  try { await document.fonts.load('900 58px "Zen Kaku Gothic Antique"'); await document.fonts.load('700 32px "Zen Kaku Gothic Antique"'); } catch(e){}
+  try { await document.fonts.ready; } catch(e){}
+
+  const W = 1200, H = 630;
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+
+  // 背景: 紫紺 radial グラデ
+  const grad = ctx.createRadialGradient(W/2, -80, 120, W/2, H/2, 900);
+  grad.addColorStop(0, "#3a2160");
+  grad.addColorStop(0.55, "#241338");
+  grad.addColorStop(1, "#1b0e2c");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // 四隅の紙吹雪ドット（5色）
+  const cc = ["#FF2E88","#19D3DA","#FFE14D","#ffffff","#2f1c47"];
+  const cluster = (cx, cy)=>{
+    for (let i=0;i<10;i++){
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.translate(cx + (Math.random()*180-90), cy + (Math.random()*180-90));
+      ctx.rotate(Math.random()*Math.PI);
+      ctx.fillStyle = cc[i % cc.length];
+      if (i % 2 === 0){ ctx.beginPath(); ctx.arc(0, 0, 6 + Math.random()*5, 0, Math.PI*2); ctx.fill(); }
+      else { const s = 9 + Math.random()*7; ctx.fillRect(-s/2, -s/2, s, s); }
+      ctx.restore();
+    }
+  };
+  cluster(80, 80); cluster(W-80, 80); cluster(80, H-80); cluster(W-80, H-80);
+
+  // ロゴ＋お題
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `900 60px ${SHARE_FONT}`;
+  ctx.fillText("あるある選挙", W/2, 96);
+  ctx.fillStyle = "#19D3DA";
+  ctx.font = `700 32px ${SHARE_FONT}`;
+  ctx.fillText(`お題「${theme}」`, W/2, 146);
+
+  // 中央カード（ステッカー影風の塗り）
+  const cx = 110, cy = 190, cw = 980, ch = 250, cr = 28;
+  ctx.fillStyle = "rgba(0,0,0,.45)";       // ベタ落ち影
+  rrPath(ctx, cx+12, cy+14, cw, ch, cr); ctx.fill();
+  ctx.fillStyle = "#ffffff";                // カード本体
+  rrPath(ctx, cx, cy, cw, ch, cr); ctx.fill();
+  ctx.lineWidth = 5; ctx.strokeStyle = "#241338";
+  rrPath(ctx, cx, cy, cw, ch, cr); ctx.stroke();
+
+  // 投稿本文（自動縮小・最大3行・カード内中央）
+  const pad = 56, maxW = cw - pad*2, maxLines = 3;
+  const { size, lines } = layoutText(ctx, best.text, maxW, maxLines);
+  const lh = size * 1.32;
+  const blockH = lines.length * lh;
+  let ty = cy + (ch - blockH)/2 + size*0.82;
+  ctx.fillStyle = "#241338";
+  ctx.font = `900 ${size}px ${SHARE_FONT}`;
+  for (const ln of lines){ ctx.fillText(ln, W/2, ty); ty += lh; }
+
+  // 下部: by 作者 ／ ◯票獲得
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `700 34px ${SHARE_FONT}`;
+  ctx.fillText(`by ${best.author}`, 120, 540);
+  ctx.fillStyle = "#FFE14D";
+  ctx.font = `900 34px ${SHARE_FONT}`;
+  ctx.fillText(`${best.votes}票獲得`, 120, 588);
+
+  // 当確スタンプ風の赤印（右下・rotate(-8deg)）
+  ctx.save();
+  ctx.translate(1040, 530);
+  ctx.rotate(-8 * Math.PI/180);
+  const ss = 130;
+  ctx.fillStyle = "#FF2E88";
+  rrPath(ctx, -ss/2, -ss/2, ss, ss, 16); ctx.fill();
+  ctx.lineWidth = 6; ctx.strokeStyle = "#ffffff";
+  rrPath(ctx, -ss/2+12, -ss/2+12, ss-24, ss-24, 10); ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = `900 46px ${SHARE_FONT}`;
+  ctx.fillText("当確", 0, 4);
+  ctx.restore();
+
+  // 出力: Web Share（files対応時）→ 不可なら PNG ダウンロード
+  cv.toBlob((blob)=>{
+    if (!blob) return;
+    const fname = "aruaru-best.png";
+    const file = new File([blob], fname, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share){
+      navigator.share({ files: [file], title: "あるある選挙", text: `ベストあるある「${best.text}」` })
+        .catch(()=> downloadBlob(blob, fname));
+    } else {
+      downloadBlob(blob, fname);
+    }
+  }, "image/png");
+}
+function downloadBlob(blob, fname){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 4000);
 }
 
 /* ---------- 投げ込みアニメ（同期演出の受け口） ---------- */
