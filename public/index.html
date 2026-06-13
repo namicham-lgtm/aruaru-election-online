@@ -157,6 +157,19 @@
   .pop-in>*:nth-child(8){animation-delay:420ms}
   .pop-in>*:nth-child(9){animation-delay:480ms}
   .pop-in>*:nth-child(n+10){animation-delay:540ms}
+  /* ---- モーダル ---- */
+  .modal-overlay{position:fixed;inset:0;z-index:100;background:rgba(36,19,56,.82);display:flex;align-items:center;justify-content:center;padding:16px}
+  .modal-card{background:var(--card);color:var(--ink);border-radius:18px;border:2.5px solid var(--ink);box-shadow:4px 4px 0 rgba(0,0,0,.35);max-width:520px;width:100%;max-height:82vh;overflow-y:auto;padding:22px 20px 18px;position:relative}
+  .modal-close{position:absolute;top:12px;right:12px;background:var(--ink);color:#fff;border:2px solid var(--ink);border-radius:50%;width:28px;height:28px;font-size:13px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+  .modal-pg{font-family:"Zen Kaku Gothic Antique";font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.12em;margin-bottom:8px}
+  .modal-title{font-family:"Zen Kaku Gothic Antique";font-weight:900;font-size:20px;margin:0 0 12px;padding-right:36px}
+  .modal-body{font-size:14px;line-height:1.8;color:var(--ink)}
+  .modal-body p{margin:.6em 0}
+  .modal-body b{font-weight:700}
+  .modal-nav{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:10px}
+  .modal-dots{display:flex;gap:6px;align-items:center}
+  .modal-dots span{width:8px;height:8px;border-radius:50%;background:var(--line);border:1.5px solid var(--ink-soft)}
+  .modal-dots span.on{background:var(--pink);border-color:var(--pink)}
   /* reduced-motion: 出現アニメ・まばたき・揺れを全て無効化 */
   @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -177,6 +190,57 @@ const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // マスコット「投函箱くん」の顔（目+笑い口）。マークアップのみ。
 const MASCOT = `<svg class="mascot" viewBox="0 0 92 70" aria-hidden="true"><g class="eyes"><circle cx="34" cy="36" r="7" fill="#fff"/><circle cx="58" cy="36" r="7" fill="#fff"/><circle cx="35" cy="37" r="3.4" fill="#241338"/><circle cx="59" cy="37" r="3.4" fill="#241338"/></g><path d="M33 47 Q46 56 59 47" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/></svg>`;
 
+const HOWTO_PAGES = [
+  { title: "あるある選挙とは",
+    body: `お題に合わせて「あるある」を投稿し、みんなの共感を集める選挙です。<br>投稿は匿名。いちばん票を集めた人が当選！` },
+  { title: "流れ",
+    body: `① お題が出る → ② 制限時間内に何個でも投稿（投函は取り消せません）<br>→ ③ 全員の投稿をながめて談笑 → ④ 共感した投稿に投票 → ⑤ 開票！` },
+  { title: "得点のヒミツ",
+    body: `<b>順位点:</b> 1位 +5 / 2位 +3 / 3位 +1。さらに——<br>
+◆ <b>一点賭け:</b> 投稿1本だけで全員の票を集めたら <b>+5！</b><br>
+◆ <b>満場一致:</b> 投稿のどれかに全員の票が集まるたび <b>+2！</b><br><br>
+▼ただし注意——<br>
+◆ 0投稿は <b style="color:var(--pink-dark)">−6</b>。<br>
+◆ いちばん多く投稿したのに4位以下だと <b style="color:var(--pink-dark)">−6！</b><br>
+たくさん出すか、一本に絞るか。それが選挙だ。` }
+];
+
+function openModal(startPage){
+  closeModal();
+  let page = startPage === undefined ? 0 : startPage;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.id = "modalOverlay";
+  const paint = ()=>{
+    const pg = HOWTO_PAGES[page];
+    const dots = HOWTO_PAGES.map((_,i)=>`<span class="${i===page?"on":""}"></span>`).join("");
+    overlay.innerHTML = `
+      <div class="modal-card" role="dialog" aria-modal="true">
+        <button class="modal-close" id="mClose" aria-label="閉じる">✕</button>
+        <div class="modal-pg">${page+1} / ${HOWTO_PAGES.length}</div>
+        <h2 class="modal-title">${pg.title}</h2>
+        <div class="modal-body"><p>${pg.body}</p></div>
+        <div class="modal-nav">
+          <button class="btn ghost sm" id="mPrev" ${page===0?"disabled":""}>← 前へ</button>
+          <div class="modal-dots">${dots}</div>
+          ${page < HOWTO_PAGES.length-1
+            ? `<button class="btn pink sm" id="mNext">次へ →</button>`
+            : `<button class="btn cyan sm" id="mDone">閉じる</button>`}
+        </div>
+      </div>`;
+    overlay.querySelector("#mClose").onclick = closeModal;
+    const mDone = overlay.querySelector("#mDone"); if(mDone) mDone.onclick = closeModal;
+    const mPrev = overlay.querySelector("#mPrev"); if(mPrev) mPrev.onclick = ()=>{ page--; paint(); };
+    const mNext = overlay.querySelector("#mNext"); if(mNext) mNext.onclick = ()=>{ page++; paint(); };
+  };
+  paint();
+  overlay.addEventListener("click", e=>{ if(e.target===overlay) closeModal(); });
+  document.body.appendChild(overlay);
+}
+function closeModal(){
+  const el = document.getElementById("modalOverlay"); if(el) el.remove();
+}
+
 /* ---------- ミュートトグル ---------- */
 (function initMute(){
   const btn = $("#muteBtn");
@@ -188,6 +252,8 @@ const MASCOT = `<svg class="mascot" viewBox="0 0 92 70" aria-hidden="true"><g cl
   sync();
   btn.onclick = ()=>{ if(window.SFX){ SFX.setMuted(!SFX.isMuted()); } sync(); };
 })();
+
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
 
 /* ---------- 操作SE（イベント委譲・1箇所のみ） ---------- */
 document.addEventListener("click", e => {
@@ -320,7 +386,10 @@ function renderLobby(){
     <span class="eyebrow">Lobby · ROOM ${esc(ST.code)}</span>
     <h2 style="font-size:22px;margin-top:4px">参加者 ${n}人</h2>
     <p class="muted small">このコードを共有して集合。${n < ST.recommended ? `<b>推奨は${ST.recommended}人以上</b>です。` : ""}</p>
-    <button class="btn ghost sm" id="copyLink" style="margin-bottom:4px">🔗 招待リンクをコピー</button>
+    <div class="row" style="margin-bottom:4px">
+      <button class="btn ghost sm" id="copyLink">🔗 招待リンクをコピー</button>
+      <button class="btn ghost sm" id="howtoLobby">📖 あそびかた</button>
+    </div>
     <ul class="plist pop-in">${ST.players.map(p=>`<li><span class="dot ${p.connected?"":"off"}"></span>${esc(p.name)}${p.left?`<span class="left-tag">退出</span>`:""}${(isHost && p.name!==ST.you.name)?`<button class="kick" data-k="${esc(p.name)}" aria-label="キック">✕</button>`:""}</li>`).join("")}</ul>
     ${isHost ? `
       <label class="fld">投稿フェーズの制限時間</label>
@@ -344,6 +413,8 @@ function renderLobby(){
     $("#start").onclick = ()=> socket.emit("game:start", { seconds: sec, matches });
     document.querySelectorAll(".kick").forEach(b=>b.onclick=()=>socket.emit("player:kick",{targetName:b.dataset.k}));
   }
+  const howtoBtn = $("#howtoLobby");
+  if (howtoBtn) howtoBtn.onclick = ()=> openModal(0);
   const copyBtn = $("#copyLink");
   if (copyBtn){
     copyBtn.onclick = ()=>{
@@ -428,17 +499,24 @@ function renderVoting(){
   if (ST.voted || ST.skipped){
     app.innerHTML = `
       <span class="eyebrow">Voting</span>
-      <h2 style="font-size:21px;margin-top:4px">${ST.skipped ? "投票スキップ" : "投票完了"}</h2>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <h2 style="font-size:21px;margin:0;flex:1">${ST.skipped ? "投票スキップ" : "投票完了"}</h2>
+        <button class="btn ghost sm" id="howtoVote" style="width:auto;padding:7px 12px" aria-label="得点のヒミツ">？</button>
+      </div>
       <div class="stage" style="min-height:150px;margin-top:12px"><div class="bbox" id="bbox">${MASCOT}<span class="face">投票</span></div></div>
       ${ST.skipped ? `<p class="warnbox" style="text-align:center">今回の投票はスキップされました</p>` : ""}
       <p class="hint" id="voteProg" style="text-align:center">投票済み ${ST.players.filter(p=>p.done).length} / ${ST.players.length} 人</p>
       <p class="muted small" style="color:var(--ink-soft)">全員の投票が揃うと自動で開票します。</p>`;
+    const hb = $("#howtoVote"); if(hb) hb.onclick = ()=> openModal(2);
     return;
   }
   const need = ST.allotment;
   app.innerHTML = `
     <span class="eyebrow">Voting</span>
-    <h2 style="font-size:21px;margin-top:4px">共感したあるあるに投票</h2>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+      <h2 style="font-size:21px;margin:0;flex:1">共感したあるあるに投票</h2>
+      <button class="btn ghost sm" id="howtoVote" style="width:auto;padding:7px 12px" aria-label="得点のヒミツ">？</button>
+    </div>
     <p class="muted small">お題「${esc(ST.theme)}」／持ち票 ${need}票（1投稿1票・自分以外）</p>
     ${ST.lowPostWarning ? `<div class="warnbox">投稿が少ないラウンドです。票の選択肢が限られます。</div>` : ""}
     <div class="vote-grid pop-in" id="grid">${ST.posts.map(p=>{
@@ -450,6 +528,7 @@ function renderVoting(){
       <button class="btn pink" id="confirm" ${picked.length!==need?"disabled":""}>投票を確定 →</button>
       <div class="err" id="verr"></div>
     </div>`;
+  const hb = $("#howtoVote"); if(hb) hb.onclick = ()=> openModal(2);
   document.querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>{
     const id = b.dataset.id;
     if (picked.includes(id)) picked = picked.filter(x=>x!==id);
